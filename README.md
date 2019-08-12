@@ -73,7 +73,7 @@ You also need to set the `KONG_PLUGINS` environment variable
 | `config.client_id` || true | OIDC Client ID |
 | `config.client_secret` || true | OIDC Client secret |
 | `config.discovery` | https://.well-known/openid-configuration | false | OIDC Discovery Endpoint (`/.well-known/openid-configuration`) |
-| `config.scope` | openid | false| OAuth2 Token scope. To use OIDC it has to contains the `openid` scope |
+| `config.scope` | openid | false| OAuth2 Token scope. To use OIDC it has to contains the `openid` scope. Note if using `refresh_token` grant then include `offline_access` as a scope. |
 | `config.ssl_verify` | false | false | Enable SSL verification to OIDC Provider |
 | `config.session_secret` | | false | Additional parameter, which is used to encrypt the session cookie. Needs to be random |
 | `config.introspection_endpoint` | | false | Token introspection endpoint |
@@ -82,6 +82,8 @@ You also need to set the `KONG_PLUGINS` environment variable
 | `config.bearer_only` | no | false | Only introspect tokens without redirecting |
 | `config.realm` | kong | false | Realm used in WWW-Authenticate response header |
 | `config.logout_path` | /logout | false | Absolute path used to logout from the OIDC RP |
+| `config.redirect_uri` || true | URI (absolute, e.g. http://website.com) to which authorization code is sent back from OIDC Provider |
+| `config.prompt`|| false | Valid values include `none`, `login`, `consent` and/or `select_account`. Note if using `refresh_token` grant then `consent` is required. See [https://openid.net/specs/openid-connect-core-1_0.html#AuthRequest](https://openid.net/specs/openid-connect-core-1_0.html#AuthRequest) |
 
 ### Enabling
 
