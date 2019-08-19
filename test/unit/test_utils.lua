@@ -15,7 +15,9 @@ function TestUtils:testOptions()
     introspection_endpoint_auth_method = "client_secret_basic",
     filters = "pattern1,pattern2,pattern3",
     logout_path = "/logout",
-    redirect_after_logout_uri = "/login"
+    redirect_uri = "http://domain.com/auth/callback",
+    redirect_after_logout_uri = "/login",
+    prompt = "login"
   }, {var = {request_uri = "/path"},
     req = {get_uri_args = function() return nil end}})
 
@@ -27,10 +29,10 @@ function TestUtils:testOptions()
   lu.assertEquals(opts.ssl_verify, "no")
   lu.assertEquals(opts.token_endpoint_auth_method, "client_secret_post")
   lu.assertEquals(opts.introspection_endpoint_auth_method, "client_secret_basic")
-  -- TODO: update tests to reflect new redirect parameter
-  -- lu.assertEquals(opts.redirect_uri_path, "/path/")
+  lu.assertEquals(opts.redirect_uri, "http://domain.com/auth/callback")
   lu.assertEquals(opts.logout_path, "/logout")
   lu.assertEquals(opts.redirect_after_logout_uri, "/login")
+  lu.assertEquals(opts.prompt, "login")
 
   local expectedFilters = {
     "pattern1",

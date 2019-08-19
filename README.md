@@ -166,6 +166,11 @@ X-Id-Token: eyJuYmYiOjAsImF6cCI6ImtvbmciLCJpYXQiOjE1NDg1MTA3NjksImlzcyI6Imh0dHA6
 
 ### Running Unit Tests
 
+Set the following environmental variables before attempting to run the unit tests:
+1. `cd test/docker/unit && export UNIT_PATH=$(pwd)` in other words, assign `UNIT_PATH` to `test/docker/unit` directory.
+2. `export KONG_BASE_TAG=1.2`
+3. **optional** `export BUILD_IMAGE_NAME=kong-oidc-test-image:VERSION_HERE`, this is used for tagging
+
 To run unit tests, run the following command:
 
 ```
