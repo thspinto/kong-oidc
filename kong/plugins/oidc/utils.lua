@@ -12,33 +12,6 @@ local function parseFilters(csvFilters)
   return filters
 end
 
-function M.get_redirect_uri_path(ngx)
-  local function drop_query()
-    local uri = ngx.var.request_uri
-    local x = uri:find("?")
-    if x then
-      return uri:sub(1, x - 1)
-    else
-      return uri
-    end
-  end
-
-  local function tackle_slash(path)
-    local args = ngx.req.get_uri_args()
-    if args and args.code then
-      return path
-    elseif path == "/" then
-      return "/cb"
-    elseif path:sub(-1) == "/" then
-      return path:sub(1, -2)
-    else
-      return path .. "/"
-    end
-  end
-
-  return tackle_slash(drop_query())
-end
-
 function M.get_options(config, ngx)
   return {
     client_id = config.client_id,
@@ -49,8 +22,9 @@ function M.get_options(config, ngx)
     introspection_endpoint_auth_method = config.introspection_endpoint_auth_method,
     bearer_only = config.bearer_only,
     realm = config.realm,
-    redirect_uri_path = config.redirect_uri_path or M.get_redirect_uri_path(ngx),
+    redirect_uri = config.redirect_uri,
     scope = config.scope,
+    prompt = config.prompt,
     response_type = config.response_type,
     ssl_verify = config.ssl_verify,
     token_endpoint_auth_method = config.token_endpoint_auth_method,

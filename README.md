@@ -73,7 +73,7 @@ You also need to set the `KONG_PLUGINS` environment variable
 | `config.client_id` || true | OIDC Client ID |
 | `config.client_secret` || true | OIDC Client secret |
 | `config.discovery` | https://.well-known/openid-configuration | false | OIDC Discovery Endpoint (`/.well-known/openid-configuration`) |
-| `config.scope` | openid | false| OAuth2 Token scope. To use OIDC it has to contains the `openid` scope |
+| `config.scope` | openid | false| OAuth2 Token scope. To use OIDC it has to contains the `openid` scope. Note if using `refresh_token` grant then include `offline_access` as a scope. |
 | `config.ssl_verify` | false | false | Enable SSL verification to OIDC Provider |
 | `config.session_secret` | | false | Additional parameter, which is used to encrypt the session cookie. Needs to be random |
 | `config.introspection_endpoint` | | false | Token introspection endpoint |
@@ -82,6 +82,8 @@ You also need to set the `KONG_PLUGINS` environment variable
 | `config.bearer_only` | no | false | Only introspect tokens without redirecting |
 | `config.realm` | kong | false | Realm used in WWW-Authenticate response header |
 | `config.logout_path` | /logout | false | Absolute path used to logout from the OIDC RP |
+| `config.redirect_uri` || true | URI (absolute, e.g. http://website.com) to which authorization code is sent back from OIDC Provider |
+| `config.prompt`|| false | Valid values include `none`, `login`, `consent` and/or `select_account`. Note if using `refresh_token` grant then `consent` is required. See [https://openid.net/specs/openid-connect-core-1_0.html#AuthRequest](https://openid.net/specs/openid-connect-core-1_0.html#AuthRequest) |
 
 ### Enabling
 
@@ -164,6 +166,11 @@ X-Id-Token: eyJuYmYiOjAsImF6cCI6ImtvbmciLCJpYXQiOjE1NDg1MTA3NjksImlzcyI6Imh0dHA6
 
 ### Running Unit Tests
 
+Set the following environmental variables before attempting to run the unit tests:
+1. `cd test/docker/unit && export UNIT_PATH=$(pwd)` in other words, assign `UNIT_PATH` to `test/docker/unit` directory.
+2. `export KONG_BASE_TAG=1.2`
+3. **optional** `export BUILD_IMAGE_NAME=kong-oidc-test-image:VERSION_HERE`, this is used for tagging
+
 To run unit tests, run the following command:
 
 ```
@@ -185,4 +192,31 @@ To tear the environment down:
 
 ```
 ./bin/teardown-env.sh
+```
+
+## Roadmap
+
+### Supporting Multiple IDPS
+
+The following is pseudocode/pseudo-schema for the ability to handle mutiple identity providers:
+```
+    - name: oidc
+      config:
+        logout_path: /echo_service/api/logout
+        redirect_uri: http://localhost:8000/echo_service/api/custom-oidc-cb
+        redirect_after_logout_uri: http://localhost:8000/echo_service/public/logout
+        idp_host_header_prop: sky_host
+        configs:
+          custom-oidc.com:
+            introspection_endpoint_auth_method: client_secret_post
+            scope: "openid offline_access"
+            prompt: consent
+            token_endpoint_auth_method: client_secret_post
+            client_id: foo
+            client_secret: bar
+            discovery:
+            - protocol: https
+            - port: 9002
+            - path: .well-known/openid-configuration
+            # - uri: http://custom-oidc:9002/.well-known/openid-configuration
 ```
