@@ -193,3 +193,30 @@ To tear the environment down:
 ```
 ./bin/teardown-env.sh
 ```
+
+## Roadmap
+
+### Supporting Multiple IDPS
+
+The following is pseudocode/pseudo-schema for the ability to handle mutiple identity providers:
+```
+    - name: oidc
+      config:
+        logout_path: /echo_service/api/logout
+        redirect_uri: http://localhost:8000/echo_service/api/custom-oidc-cb
+        redirect_after_logout_uri: http://localhost:8000/echo_service/public/logout
+        idp_host_header_prop: sky_host
+        configs:
+          custom-oidc.com:
+            introspection_endpoint_auth_method: client_secret_post
+            scope: "openid offline_access"
+            prompt: consent
+            token_endpoint_auth_method: client_secret_post
+            client_id: foo
+            client_secret: bar
+            discovery:
+            - protocol: https
+            - port: 9002
+            - path: .well-known/openid-configuration
+            # - uri: http://custom-oidc:9002/.well-known/openid-configuration
+```
