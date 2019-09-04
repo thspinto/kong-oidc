@@ -2,7 +2,7 @@
 
 [![Join the chat at https://gitter.im/nokia/kong-oidc](https://badges.gitter.im/nokia/kong-oidc.svg)](https://gitter.im/nokia/kong-oidc?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
 
-**Continuous Integration:** [![Build Status](https://travis-ci.org/nokia/kong-oidc.svg?branch=master)](https://travis-ci.org/nokia/kong-oidc) 
+**Continuous Integration:** [![Build Status](https://travis-ci.org/nokia/kong-oidc.svg?branch=master)](https://travis-ci.org/nokia/kong-oidc)
 [![Coverage Status](https://coveralls.io/repos/github/nokia/kong-oidc/badge.svg?branch=master)](https://coveralls.io/github/nokia/kong-oidc?branch=master) <br/>
 
 **kong-oidc** is a plugin for [Kong](https://github.com/Mashape/kong) implementing the
@@ -62,7 +62,7 @@ If you're using `luarocks` execute the following:
 You also need to set the `KONG_PLUGINS` environment variable
 
      export KONG_PLUGINS=oidc
-     
+
 ## Usage
 
 ### Parameters
@@ -166,15 +166,19 @@ X-Id-Token: eyJuYmYiOjAsImF6cCI6ImtvbmciLCJpYXQiOjE1NDg1MTA3NjksImlzcyI6Imh0dHA6
 
 ### Running Unit Tests
 
-Set the following environmental variables before attempting to run the unit tests:
+Set the following environment variables before attempting to run the unit tests:
 1. `cd test/docker/unit && export UNIT_PATH=$(pwd)` in other words, assign `UNIT_PATH` to `test/docker/unit` directory.
 2. `export KONG_BASE_TAG=1.2`
 3. **optional** `export BUILD_IMAGE_NAME=kong-oidc-test-image:VERSION_HERE`, this is used for tagging
 
 To run unit tests, run the following command:
 
-```
+```bash
 ./bin/run-unit-tests.sh
+
+# or
+
+UNIT_PATH="test/docker/unit" KONG_BASE_TAG=1.2 ./bin/run-unit-tests.sh
 ```
 
 This may take a while for the first run, as the docker image will need to be built, but subsequent runs will be quick.
