@@ -21,6 +21,12 @@ function TestUtils:testOptions()
   }, {var = {request_uri = "/path"},
     req = {get_uri_args = function() return nil end}})
 
+  local expectedFilters = {
+    "pattern1",
+    "pattern2",
+    "pattern3"
+  }
+
   lu.assertEquals(opts.client_id, 1)
   lu.assertEquals(opts.client_secret, 2)
   lu.assertEquals(opts.discovery, "d")
@@ -29,20 +35,12 @@ function TestUtils:testOptions()
   lu.assertEquals(opts.ssl_verify, "no")
   lu.assertEquals(opts.token_endpoint_auth_method, "client_secret_post")
   lu.assertEquals(opts.introspection_endpoint_auth_method, "client_secret_basic")
-  lu.assertEquals(opts.redirect_uri, "http://domain.com/auth/callback")
+  lu.assertItemsEquals(opts.filters, expectedFilters)
   lu.assertEquals(opts.logout_path, "/logout")
+  lu.assertEquals(opts.redirect_uri, "http://domain.com/auth/callback")
   lu.assertEquals(opts.redirect_after_logout_uri, "/login")
   lu.assertEquals(opts.prompt, "login")
 
-  local expectedFilters = {
-    "pattern1",
-    "pattern2",
-    "pattern3"
-  }
-
-  lu.assertItemsEquals(expectedFilters, opts.filters)
-
 end
-
 
 lu.run()
