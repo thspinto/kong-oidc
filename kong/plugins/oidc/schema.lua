@@ -19,7 +19,6 @@ return {
     recovery_page_path = { type = "string" },
     logout_path = { type = "string", required = false, default = '/logout' },
     redirect_after_logout_uri = { type = "string", required = false, default = '/' },
-    filters = { type = "string" },
-    xhr_header = { type = "string", required = false, default = "X-Requested-With" }
+    filters = { type = "string" }
   }
 }
