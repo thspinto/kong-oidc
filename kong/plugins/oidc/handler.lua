@@ -3,6 +3,7 @@ local OidcHandler = BasePlugin:extend()
 local utils = require("kong.plugins.oidc.utils")
 local filter = require("kong.plugins.oidc.filter")
 local session = require("kong.plugins.oidc.session")
+local cjson = require("cjson")
 
 OidcHandler.PRIORITY = 1000
 
@@ -52,7 +53,28 @@ end
 
 function make_oidc(oidcConfig)
   ngx.log(ngx.DEBUG, "OidcHandler calling authenticate, requested path: " .. ngx.var.request_uri)
-  local res, err = require("resty.openidc").authenticate(oidcConfig)
+
+  -- grab X-Requested-With Header to see if request was from browser/ajax
+  local unauth_action = nil
+  local xhr_value = ngx.req.get_headers()['X-Requested-With']
+  
+  -- was the request ajax/async?
+  if xhr_value == 'XMLHttpRequest' then
+    -- reference: https://github.com/zmartzone/lua-resty-openidc/blob/master/lib/resty/openidc.lua#L1436
+    -- set to deny so resty.openidc returns instead of redirects (ends request)
+    unauth_action = 'deny'
+  end
+
+  local res, err = require("resty.openidc").authenticate(oidcConfig, nil, unauth_action)
+
+  -- if err is 'unauthorized request' we know that token/session has expired/invalid AND request is Ajax/Async since
+  -- code execution has gone this far, so return 401 status code to allow client to respond accordingly
+  if err == 'unauthorized request' then
+    ngx.status = ngx.HTTP_UNAUTHORIZED
+    ngx.say(cjson.encode({ status = ngx.status, request_path = ngx.var.request_uri}))
+    return ngx.exit(ngx.HTTP_UNAUTHORIZED)
+  end
+
   if err then
     if oidcConfig.recovery_page_path then
       ngx.log(ngx.DEBUG, "Entering recovery page: " .. oidcConfig.recovery_page_path)
