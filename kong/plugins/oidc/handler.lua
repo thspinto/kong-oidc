@@ -3,6 +3,7 @@ local OidcHandler = BasePlugin:extend()
 local utils = require("kong.plugins.oidc.utils")
 local filter = require("kong.plugins.oidc.filter")
 local session = require("kong.plugins.oidc.session")
+local cjson = require("cjson")
 
 OidcHandler.PRIORITY = 1000
 
@@ -52,7 +53,21 @@ end
 
 function make_oidc(oidcConfig)
   ngx.log(ngx.DEBUG, "OidcHandler calling authenticate, requested path: " .. ngx.var.request_uri)
-  local res, err = require("resty.openidc").authenticate(oidcConfig)
+  local unauth_action = nil
+  local xhr_value = ngx.req.get_headers()[oidcConfig.xhr_header]
+  
+  if xhr_value == 'XMLHttpRequest' then
+    unauth_action = 'deny'
+  end
+
+  local res, err = require("resty.openidc").authenticate(oidcConfig, nil, unauth_action)
+
+  if err == 'unauthorized request' then
+    ngx.status = ngx.HTTP_UNAUTHORIZED
+    ngx.say(cjson.encode({ status = ngx.status, request_path = ngx.var.request_uri}))
+    return ngx.exit(ngx.HTTP_UNAUTHORIZED)
+  end
+
   if err then
     if oidcConfig.recovery_page_path then
       ngx.log(ngx.DEBUG, "Entering recovery page: " .. oidcConfig.recovery_page_path)
