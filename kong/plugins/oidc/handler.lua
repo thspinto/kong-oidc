@@ -59,8 +59,8 @@ function make_oidc(oidcConfig)
   local args, err = ngx.req.get_uri_args()
   if not err then
     local login_hint = args["login_hint"]
-    ngx.log(ngx.DEBUG, "OidcHandler found login_hint query param: " .. login_hint .. " adding it authorization_params")
     if login_hint then
+      ngx.log(ngx.DEBUG, "OidcHandler found login_hint query param: " .. login_hint .. " adding it authorization_params")
       oidcConfig["authorization_params"] = {
         login_hint = login_hint
       }
