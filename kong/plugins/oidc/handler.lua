@@ -17,6 +17,7 @@ function OidcHandler:access(config)
   local oidcConfig = utils.get_options(config, ngx)
 
   if filter.shouldProcessRequest(oidcConfig) then
+    ngx.log(ngx.DEBUG, "OidcHandler processing request, path: " .. ngx.var.request_uri)
     session.configure(config)
     handle(oidcConfig)
   else
@@ -70,7 +71,7 @@ function make_oidc(oidcConfig)
   -- grab X-Requested-With Header to see if request was from browser/ajax
   local unauth_action = nil
   local xhr_value = ngx.req.get_headers()["X-Requested-With"]
-  
+
   -- was the request ajax/async?
   if xhr_value == "XMLHttpRequest" then
     -- reference: https://github.com/zmartzone/lua-resty-openidc/blob/master/lib/resty/openidc.lua#L1436
