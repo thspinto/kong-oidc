@@ -193,6 +193,77 @@ function TestHandler:test_bearer_only_with_bad_token()
   lu.assertFalse(self:log_contains("introspect succeeded"))
 end
 
+function TestHandler:test_authenticate_ok_with_login_hint()
+  -- arrange
+  local auth_param_login_hint
+  
+  ngx.req.get_uri_args = function()
+    return {
+      login_hint = "username123"
+    }
+  end
+
+  self.module_resty.openidc.authenticate = function(opts)
+    auth_param_login_hint= opts.authorization_params.login_hint
+    return {}, true
+  end
+
+  -- act
+  self.handler:access({})
+  
+  -- assert
+  lu.assertTrue(self:log_contains("login_hint found"))
+  lu.assertEquals(auth_param_login_hint, "username123")
+end
+
+function TestHandler:test_authenticate_ok_with_xmlhttprequest()
+  -- arrange
+  local actual_unauth_action
+  
+  -- add XMLHttpRequest to headers
+  ngx.req.get_headers = function()
+    local headers = {}
+    headers["X-Requested-With"] = "XMLHttpRequest"
+    return headers
+  end
+
+  -- mock authenticate to be able to check unauth_action
+  self.module_resty.openidc.authenticate = function(opts, target_url, unauth_action)
+    actual_unauth_action = unauth_action
+    return {}, false
+  end
+
+  -- act
+  self.handler:access({})
+  
+  -- assert
+  lu.assertTrue(self:log_contains("ajax/async request detected"))
+  lu.assertEquals(actual_unauth_action, "deny")
+end
+
+function TestHandler:test_authenticate_nok_with_xmlhttprequest()
+  -- arrange
+
+  -- add XMLHttpRequest to headers
+  ngx.req.get_headers = function()
+    local headers = {}
+    headers["X-Requested-With"] = "XMLHttpRequest"
+    return headers
+  end
+
+  -- mock authenticate to be able to check unauth_action
+  self.module_resty.openidc.authenticate = function(opts, target_url, unauth_action)
+    return {}, "unauthorized request"
+  end
+
+  -- act
+  self.handler:access({})
+
+  -- assert
+  lu.assertTrue(self:log_contains("ajax/async request detected"))
+  lu.assertEquals(ngx.status, ngx.HTTP_UNAUTHORIZED)
+end
+
 lu.run()
 
 
