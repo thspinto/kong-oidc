@@ -1,25 +1,32 @@
 local utils = require("kong.plugins.oidc.utils")
 local lu = require("luaunit")
+local opts_fixture = nil
 
 TestUtils = require("test.unit.base_case"):extend()
 
+function TestUtils:setUp()
+  opts_fixture = {
+      client_id = 1,
+      client_secret = 2,
+      discovery = "d",
+      scope = "openid",
+      response_type = "code",
+      ssl_verify = "no",
+      token_endpoint_auth_method = "client_secret_post",
+      introspection_endpoint_auth_method = "client_secret_basic",
+      filters = "pattern1,pattern2,pattern3",
+      logout_path = "/logout",
+      redirect_uri = "http://domain.com/auth/callback",
+      redirect_after_logout_uri = "/login",
+      prompt = "login"
+    },
+    {var = {request_uri = "/path"},
+    req = {get_uri_args = function() return nil end}
+  }
+end
+
 function TestUtils:testOptions()
-  local opts = utils.get_options({
-    client_id = 1,
-    client_secret = 2,
-    discovery = "d",
-    scope = "openid",
-    response_type = "code",
-    ssl_verify = "no",
-    token_endpoint_auth_method = "client_secret_post",
-    introspection_endpoint_auth_method = "client_secret_basic",
-    filters = "pattern1,pattern2,pattern3",
-    logout_path = "/logout",
-    redirect_uri = "http://domain.com/auth/callback",
-    redirect_after_logout_uri = "/login",
-    prompt = "login"
-  }, {var = {request_uri = "/path"},
-    req = {get_uri_args = function() return nil end}})
+  local opts = utils.get_options(opts_fixture)
 
   local expectedFilters = {
     "pattern1",
@@ -41,6 +48,20 @@ function TestUtils:testOptions()
   lu.assertEquals(opts.redirect_after_logout_uri, "/login")
   lu.assertEquals(opts.prompt, "login")
 
+end
+
+function TestUtils:testDiscoveryOverride()
+  -- assign
+  opts_fixture.discovery = nil
+  opts_fixture.discovery_override = {
+    authorization_endpoint = "https://localhost/auth/endpoint"
+  }
+  
+  -- act
+  local opts = utils.get_options(opts_fixture)
+
+  -- assert
+  lu.assertItemsEquals(opts.discovery, opts_fixture.discovery_override)
 end
 
 lu.run()
