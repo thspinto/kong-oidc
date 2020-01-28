@@ -13,10 +13,17 @@ local function parseFilters(csvFilters)
 end
 
 function M.get_options(config, ngx)
+
+  -- check to see if override is provided
+  local discovery = config.discovery
+  if config.discovery_override then
+    discovery = config.discovery_override
+  end
+
   return {
     client_id = config.client_id,
     client_secret = config.client_secret,
-    discovery = config.discovery,
+    discovery = discovery,
     introspection_endpoint = config.introspection_endpoint,
     timeout = config.timeout,
     introspection_endpoint_auth_method = config.introspection_endpoint_auth_method,
