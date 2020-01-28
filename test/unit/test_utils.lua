@@ -1,10 +1,12 @@
 local utils = require("kong.plugins.oidc.utils")
 local lu = require("luaunit")
+-- opts_fixture is global to prevent mutation in consecutive tests
 local opts_fixture = nil
 
 TestUtils = require("test.unit.base_case"):extend()
 
 function TestUtils:setUp()
+  -- reset opts_fixture
   opts_fixture = {
       client_id = 1,
       client_secret = 2,
