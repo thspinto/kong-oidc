@@ -1,7 +1,8 @@
 local utils = require("kong.plugins.oidc.utils")
 local lu = require("luaunit")
--- opts_fixture is global to prevent mutation in consecutive tests
+-- opts_fixture, ngx are global to prevent mutation in consecutive tests
 local opts_fixture = nil
+local ngx = nil
 
 TestUtils = require("test.unit.base_case"):extend()
 
@@ -20,15 +21,18 @@ function TestUtils:setUp()
       logout_path = "/logout",
       redirect_uri = "http://domain.com/auth/callback",
       redirect_after_logout_uri = "/login",
-      prompt = "login"
-    },
-    {var = {request_uri = "/path"},
-    req = {get_uri_args = function() return nil end}
-  }
+      prompt = "login",
+      session = { cookie = { samesite = "None" } },
+    }
+
+    ngx = {
+      var = { request_uri = "/path"},
+      req = { get_uri_args = function() return nil end }
+    }
 end
 
 function TestUtils:testOptions()
-  local opts = utils.get_options(opts_fixture)
+  local opts, session = utils.get_options(opts_fixture, ngx)
 
   local expectedFilters = {
     "pattern1",
@@ -49,6 +53,7 @@ function TestUtils:testOptions()
   lu.assertEquals(opts.redirect_uri, "http://domain.com/auth/callback")
   lu.assertEquals(opts.redirect_after_logout_uri, "/login")
   lu.assertEquals(opts.prompt, "login")
+  lu.assertEquals(session.cookie.samesite, "None")
 
 end
 
@@ -58,7 +63,7 @@ function TestUtils:testDiscoveryOverride()
   opts_fixture.discovery_override = {
     authorization_endpoint = "https://localhost/auth/endpoint"
   }
-  
+
   -- act
   local opts = utils.get_options(opts_fixture)
 

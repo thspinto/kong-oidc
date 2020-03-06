@@ -20,6 +20,7 @@ function M.get_options(config, ngx)
     discovery = config.discovery_override
   end
 
+  -- return TWO separate values as we don't want to pollute opts.session
   return {
     client_id = config.client_id,
     client_secret = config.client_secret,
@@ -39,7 +40,7 @@ function M.get_options(config, ngx)
     filters = parseFilters(config.filters),
     logout_path = config.logout_path,
     redirect_after_logout_uri = config.redirect_after_logout_uri,
-  }
+  }, config.session
 end
 
 function M.exit(httpStatusCode, message, ngxCode)

@@ -29,6 +29,21 @@ return {
           { logout_path = { type = "string", required = false, default = '/logout' } },
           { redirect_after_logout_uri = { type = "string", required = false, default = '/' } },
           { filters = { type = "string" } },
+          { session = {
+              type = "record",
+              required = false,
+              fields = {
+                { cookie = {
+                    type = "record",
+                    required = false,
+                    fields = {
+                      { samesite = { type = "string", required = false, default = "Lax" } }
+                    }
+                  }
+                }
+              }
+            }
+          },
           { discovery_override = {
               type = "record",
               required = false,
