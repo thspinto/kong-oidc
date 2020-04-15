@@ -4,7 +4,6 @@ return {
   name = "kong-oidc",
   fields = {
     { consumer = typedefs.no_consumer },
-    { run_on = typedefs.run_on_first },
     {
       config = {
         type = "record",
@@ -37,7 +36,8 @@ return {
                     type = "record",
                     required = false,
                     fields = {
-                      { samesite = { type = "string", required = false, default = "Lax" } }
+                      { samesite = { type = "string", required = false, default = "None" } },
+                      { secure = { type = "boolean", default = true } }
                     }
                   }
                 }
