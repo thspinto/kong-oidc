@@ -82,7 +82,10 @@ function make_oidc(oidcConfig, oidcSessionConfig)
     end
   end
 
-  local res, err = require("resty.openidc").authenticate(oidcConfig, nil, unauth_action, oidcSessionConfig)
+  local res, err, original_url, session = require("resty.openidc").authenticate(oidcConfig, nil, unauth_action, oidcSessionConfig)
+
+  -- handle and close session, prevent locking
+  session:close()
 
   -- if err is "unauthorized request" we know that token/session has expired/invalid AND request is Ajax/Async since
   -- code execution has gone this far, so return 401 status code to allow client to respond accordingly
@@ -105,7 +108,11 @@ end
 
 function introspect(oidcConfig)
   if utils.has_bearer_access_token() or oidcConfig.bearer_only == "yes" then
-    local res, err = require("resty.openidc").introspect(oidcConfig)
+    local res, err, original_url, session = require("resty.openidc").introspect(oidcConfig)
+
+    -- handle and close session, prevent locking
+    session:close()
+
     if err then
       if oidcConfig.bearer_only == "yes" then
         ngx.header["WWW-Authenticate"] = 'Bearer realm="' .. oidcConfig.realm .. '",error="' .. err .. '"'
