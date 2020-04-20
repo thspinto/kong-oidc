@@ -36,7 +36,7 @@ function TestHandler:test_authenticate_ok_with_userinfo()
   ngx.encode_base64 = function(x)
     return "eyJzdWIiOiJzdWIifQ=="
   end
-  
+
   local headers = {}
   ngx.req.set_header = function(h, v)
     headers[h] = v
@@ -52,7 +52,7 @@ function TestHandler:test_authenticate_ok_with_no_accesstoken()
   self.module_resty.openidc.authenticate = function(opts)
     return {}, true
   end
-  
+
   local headers = {}
   ngx.req.set_header = function(h, v)
     headers[h] = v
@@ -67,7 +67,7 @@ function TestHandler:test_authenticate_ok_with_accesstoken()
   self.module_resty.openidc.authenticate = function(opts)
     return {access_token = "ACCESS_TOKEN"}, true
   end
-  
+
   local headers = {}
   ngx.req.set_header = function(h, v)
     headers[h] = v
@@ -82,7 +82,7 @@ function TestHandler:test_authenticate_ok_with_no_idtoken()
   self.module_resty.openidc.authenticate = function(opts)
     return {}, true
   end
-  
+
   local headers = {}
   ngx.req.set_header = function(h, v)
     headers[h] = v
@@ -101,7 +101,7 @@ function TestHandler:test_authenticate_ok_with_idtoken()
   ngx.encode_base64 = function(x)
     return "eyJzdWIiOiJzdWIifQ=="
   end
-  
+
   local headers = {}
   ngx.req.set_header = function(h, v)
     headers[h] = v
@@ -196,7 +196,7 @@ end
 function TestHandler:test_authenticate_ok_with_login_hint()
   -- arrange
   local auth_param_login_hint
-  
+
   ngx.req.get_uri_args = function()
     return {
       login_hint = "username123"
@@ -210,7 +210,7 @@ function TestHandler:test_authenticate_ok_with_login_hint()
 
   -- act
   self.handler:access({})
-  
+
   -- assert
   lu.assertTrue(self:log_contains("login_hint found"))
   lu.assertEquals(auth_param_login_hint, "username123")
@@ -219,7 +219,7 @@ end
 function TestHandler:test_authenticate_ok_with_xmlhttprequest()
   -- arrange
   local actual_unauth_action
-  
+
   -- add XMLHttpRequest to headers
   ngx.req.get_headers = function()
     local headers = {}
@@ -235,7 +235,7 @@ function TestHandler:test_authenticate_ok_with_xmlhttprequest()
 
   -- act
   self.handler:access({})
-  
+
   -- assert
   lu.assertTrue(self:log_contains("ajax/async request detected"))
   lu.assertEquals(actual_unauth_action, "deny")
@@ -262,6 +262,31 @@ function TestHandler:test_authenticate_nok_with_xmlhttprequest()
   -- assert
   lu.assertTrue(self:log_contains("ajax/async request detected"))
   lu.assertEquals(ngx.status, ngx.HTTP_UNAUTHORIZED)
+end
+
+function TestHandler:test_authenticate_with_session_cookie_samesite_set_to_none()
+  -- arrange
+  local opts = {
+    session = {
+      cookie = {
+        samesite = "None"
+      }
+    }
+  }
+
+  local session = nil;
+
+  self.module_resty.openidc.authenticate = function(opts, target_url, unauth_action, session_opts)
+    session = session_opts
+    return {}, true
+  end
+
+
+  -- act
+  self.handler:access(opts)
+
+  -- assert
+  lu.assertItemsEquals(session, opts.session)
 end
 
 lu.run()

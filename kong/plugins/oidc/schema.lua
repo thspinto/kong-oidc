@@ -4,7 +4,6 @@ return {
   name = "kong-oidc",
   fields = {
     { consumer = typedefs.no_consumer },
-    { run_on = typedefs.run_on_first },
     {
       config = {
         type = "record",
@@ -29,6 +28,22 @@ return {
           { logout_path = { type = "string", required = false, default = '/logout' } },
           { redirect_after_logout_uri = { type = "string", required = false, default = '/' } },
           { filters = { type = "string" } },
+          { session = {
+              type = "record",
+              required = false,
+              fields = {
+                { cookie = {
+                    type = "record",
+                    required = false,
+                    fields = {
+                      { samesite = { type = "string", required = false, default = "Lax" } },
+                      { secure = { type = "boolean", default = true } }
+                    }
+                  }
+                }
+              }
+            }
+          },
           { discovery_override = {
               type = "record",
               required = false,
