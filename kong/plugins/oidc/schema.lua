@@ -36,7 +36,7 @@ return {
                     type = "record",
                     required = false,
                     fields = {
-                      { samesite = { type = "string", required = false, default = "None" } },
+                      { samesite = { type = "string", required = false, default = "Lax" } },
                       { secure = { type = "boolean", default = true } }
                     }
                   }
