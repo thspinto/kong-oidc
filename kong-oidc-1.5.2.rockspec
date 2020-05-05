@@ -1,8 +1,8 @@
 package = "kong-oidc"
-version = "1.5.1"
+version = "1.5.2"
 source = {
     url = "git://github.com/skylineos/kong-oidc",
-    tag = "v1.5.1",
+    tag = "v1.5.2",
     dir = "kong-oidc"
 }
 description = {
