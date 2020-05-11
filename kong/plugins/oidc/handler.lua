@@ -4,6 +4,7 @@ local utils = require("kong.plugins.oidc.utils")
 local filter = require("kong.plugins.oidc.filter")
 local session = require("kong.plugins.oidc.session")
 local cjson = require("cjson")
+local openidc = require("resty.openidc")
 
 OidcHandler.PRIORITY = 1000
 
@@ -31,11 +32,24 @@ function handle(oidcConfig, oidcSessionConfig)
   local response
   if oidcConfig.introspection_endpoint then
     response = introspect(oidcConfig)
+
+    -- if response, then introspect successful
     if response then
-      utils.injectUser(response)
+      local access_token = utils.get_bearer_access_token_from_header(oidcConfig)
+      local user_info = get_user_info(oidcConfig, response)
+
+      if access_token then
+        utils.injectAccessToken(access_token)
+      end
+
+      if user_info then
+        utils.injectUser(user_info)
+      end
     end
+
   end
 
+  -- no valid access token, force oidc authentication
   if response == nil then
     response = make_oidc(oidcConfig, oidcSessionConfig)
     if response then
@@ -82,7 +96,7 @@ function make_oidc(oidcConfig, oidcSessionConfig)
     end
   end
 
-  local res, err, original_url, session = require("resty.openidc").authenticate(oidcConfig, nil, unauth_action, oidcSessionConfig)
+  local res, err, original_url, session = openidc.authenticate(oidcConfig, nil, unauth_action, oidcSessionConfig)
 
   -- @todo: add unit test to check for session:close()
   -- handle and close session, prevent locking
@@ -92,9 +106,8 @@ function make_oidc(oidcConfig, oidcSessionConfig)
   -- code execution has gone this far, so return 401 status code to allow client to respond accordingly
   if err == "unauthorized request" then
     ngx.log(ngx.DEBUG, "OidcHandler unauthorized ajax/async request detected, responding with 401 status code")
-    ngx.status = ngx.HTTP_UNAUTHORIZED
-    ngx.say(cjson.encode({ status = ngx.status, request_path = ngx.var.request_uri}))
-    return ngx.exit(ngx.HTTP_UNAUTHORIZED)
+    local message = cjson.encode({ status = ngx.status, request_path = ngx.var.request_uri})
+    utils.exit(ngx.HTTP_UNAUTHORIZED, message, ngx.HTTP_UNAUTHORIZED)
   end
 
   if err then
@@ -109,8 +122,10 @@ end
 
 function introspect(oidcConfig)
   if utils.has_bearer_access_token() or oidcConfig.bearer_only == "yes" then
-    local res, err = require("resty.openidc").introspect(oidcConfig)
+    -- introspect token
+    local res, err = openidc.introspect(oidcConfig)
 
+    -- check if token is valid (err returned)
     if err then
       if oidcConfig.bearer_only == "yes" then
         ngx.header["WWW-Authenticate"] = 'Bearer realm="' .. oidcConfig.realm .. '",error="' .. err .. '"'
@@ -122,6 +137,48 @@ function introspect(oidcConfig)
     return res
   end
   return nil
+end
+
+function get_user_info(oidcConfig, introspect_response)
+  local access_token = utils.get_bearer_access_token_from_header(oidcConfig)
+  local user_info = utils.cache_get("userinfo", access_token)
+  local err = nil
+  
+  -- cache miss
+  if not user_info then
+    ngx.log(ngx.INFO, "userinfo cache miss, calling userinfo endpoint")
+    user_info, err = openidc.call_userinfo_endpoint(oidcConfig, access_token)
+    
+    if err then
+      return nil, err
+    end
+
+    local introspection_cache_ignore = oidcConfig.introspection_cache_ignore or false
+    local expiry_claim = oidcConfig.introspection_expiry_claim or "exp"
+    local introspection_interval = oidcConfig.introspection_interval or 0
+    
+    if not introspection_cache_ignore and introspect_response[expiry_claim] then
+      local ttl = introspect_response[expiry_claim]
+      ngx.log(ngx.INFO, ttl)
+
+      if expiry_claim == "exp" then --https://tools.ietf.org/html/rfc7662#section-2.2
+        ttl = ttl - ngx.time()
+      end
+      if introspection_interval > 0 then
+        if ttl > introspection_interval then
+          ttl = introspection_interval
+        end
+      end
+      ngx.log(ngx.INFO, "setting cache now")
+      ngx.log(ngx.INFO, "cach ttl: " .. ttl)
+      utils.cache_set("userinfo", access_token, cjson.encode(user_info), ttl)
+    end
+
+  else
+    user_info = cjson.decode(user_info)
+  end
+
+  return user_info
 end
 
 

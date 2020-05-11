@@ -78,4 +78,54 @@ function M.has_bearer_access_token()
   return false
 end
 
+function M.get_bearer_access_token_from_header(opts)
+
+  local err
+
+  -- get the access token from the Authorization header
+  local headers = ngx.req.get_headers()
+  local header_name = "Authorization"
+  local header = headers[header_name]
+
+  if header == nil or header:find(" ") == nil then
+    err = "no Authorization header found"
+    ngx.log(ngx.ERR, err)
+    return nil, err
+  end
+
+  local divider = header:find(' ')
+  if string.lower(header:sub(0, divider - 1)) ~= string.lower("Bearer") then
+    err = "no Bearer authorization header value found"
+    ngx.log(ngx.ERR, err)
+    return nil, err
+  end
+
+  local access_token = header:sub(divider + 1)
+  if access_token == nil then
+    err = "no Bearer access token value found"
+    ngx.log(ngx.ERR, err)
+    return nil, err
+  end
+
+  return access_token, err
+end
+
+function M.cache_set(type, key, value, exp)
+  local dict = ngx.shared[type]
+  if dict and (exp > 0) then
+    local success, err, forcible = dict:set(key, value, exp)
+    ngx.log(ngx.DEBUG, "cache set: success=", success, " err=", err, " forcible=", forcible)
+  end
+end
+
+function M.cache_get(type, key)
+  local dict = ngx.shared[type]
+  local value
+  if dict then
+    value = dict:get(key)
+    if value then ngx.log(ngx.DEBUG, "cache hit: type=" .. type .. " key=" .. key) end
+  end
+  return value
+end
+
 return M
