@@ -30,38 +30,34 @@ end
 
 function handle(oidcConfig, oidcSessionConfig)
   local response
+
+  -- attempt introspection of potential bearer token
   if oidcConfig.introspection_endpoint then
     response = introspect(oidcConfig)
-
     -- if response, then introspect successful
     if response then
       local access_token = utils.get_bearer_access_token_from_header(oidcConfig)
       local user_info = get_user_info(oidcConfig, response)
-
-      if access_token then
-        utils.injectAccessToken(access_token)
-      end
-
-      if user_info then
-        utils.injectUser(user_info)
-      end
+      response.access_token = access_token
+      response.user = user_info
     end
-
   end
 
   -- no valid access token, force oidc authentication
   if response == nil then
     response = make_oidc(oidcConfig, oidcSessionConfig)
-    if response then
-      if (response.user) then
-        utils.injectUser(response.user)
-      end
-      if (response.access_token) then
-        utils.injectAccessToken(response.access_token)
-      end
-      if (response.id_token) then
-        utils.injectIDToken(response.id_token)
-      end
+  end
+
+  -- attach headers if we have them
+  if response then
+    if (response.user) then
+      utils.injectUser(response.user)
+    end
+    if (response.access_token) then
+      utils.injectAccessToken(response.access_token)
+    end
+    if (response.id_token) then
+      utils.injectIDToken(response.id_token)
     end
   end
 end
@@ -141,6 +137,7 @@ end
 
 function get_user_info(oidcConfig, introspect_response)
   local access_token = utils.get_bearer_access_token_from_header(oidcConfig)
+  -- todo: add tests to verify cache hit
   local user_info = utils.cache_get("userinfo", access_token)
   local err = nil
   
@@ -153,6 +150,7 @@ function get_user_info(oidcConfig, introspect_response)
       return nil, err
     end
 
+    -- todo: add tests to verify values are respected
     local introspection_cache_ignore = oidcConfig.introspection_cache_ignore or false
     local expiry_claim = oidcConfig.introspection_expiry_claim or "exp"
     local introspection_interval = oidcConfig.introspection_interval or 0

@@ -10,6 +10,9 @@ function TestHandler:setUp()
     close = function(...) end
   }
 
+  package.loaded["kong.plugins.oidc.utils"] = nil
+  package.preload["kong.plugins.oidc.utils"] = require("kong.plugins.oidc.utils")
+
   package.loaded["resty.openidc"] = nil
   self.module_resty = {
     openidc = {
@@ -35,17 +38,26 @@ function TestHandler:tearDown()
   TestHandler.super:tearDown()
 end
 
-function TestHandler:test_authenticate_ok_no_userinfo()
+function TestHandler:test_authenticate_is_called()
+  -- arrange
+  local authenticate_called = false
   self.module_resty.openidc.authenticate = function(opts)
+    authenticate_called = true
     return {}, false, "/", session
   end
 
+  -- act
   self.handler:access({})
-  lu.assertTrue(self:log_contains("calling authenticate"))
+
+  -- assert
+  lu.assertTrue(authenticate_called)
 end
 
 function TestHandler:test_authenticate_ok_with_userinfo()
+  -- arrange
+  local authenticate_called = false
   self.module_resty.openidc.authenticate = function(opts)
+    authenticate_called = true
     return {user = {sub = "sub"}}, false, "/", session
   end
   ngx.encode_base64 = function(x)
@@ -57,14 +69,20 @@ function TestHandler:test_authenticate_ok_with_userinfo()
     headers[h] = v
   end
 
+  -- act
   self.handler:access({})
-  lu.assertTrue(self:log_contains("calling authenticate"))
+  
+  -- assert
+  lu.assertTrue(authenticate_called)
   lu.assertEquals(ngx.ctx.authenticated_credential.id, "sub")
   lu.assertEquals(headers['X-Userinfo'], "eyJzdWIiOiJzdWIifQ==")
 end
 
 function TestHandler:test_authenticate_ok_with_no_accesstoken()
+  -- arrange
+  local authenticate_called = false
   self.module_resty.openidc.authenticate = function(opts)
+    authenticate_called = true
     return {}, true, "/", session
   end
 
@@ -73,13 +91,19 @@ function TestHandler:test_authenticate_ok_with_no_accesstoken()
     headers[h] = v
   end
 
+  -- act
   self.handler:access({})
-  lu.assertTrue(self:log_contains("calling authenticate"))
+  
+  -- assert
+  lu.assertTrue(authenticate_called)
   lu.assertNil(headers['X-Access-Token'])
 end
 
 function TestHandler:test_authenticate_ok_with_accesstoken()
+  -- arrange
+  local authenticate_called = false
   self.module_resty.openidc.authenticate = function(opts)
+    authenticate_called = true
     return {access_token = "ACCESS_TOKEN"}, true, "/", session
   end
 
@@ -88,13 +112,19 @@ function TestHandler:test_authenticate_ok_with_accesstoken()
     headers[h] = v
   end
 
+  -- act
   self.handler:access({})
-  lu.assertTrue(self:log_contains("calling authenticate"))
+  
+  -- assert
+  lu.assertTrue(authenticate_called)
   lu.assertEquals(headers['X-Access-Token'], "ACCESS_TOKEN")
 end
 
 function TestHandler:test_authenticate_ok_with_no_idtoken()
+  -- arrange
+  local authenticate_called = false
   self.module_resty.openidc.authenticate = function(opts)
+    authenticate_called = true
     return {}, true, "/", session
   end
 
@@ -103,13 +133,19 @@ function TestHandler:test_authenticate_ok_with_no_idtoken()
     headers[h] = v
   end
 
+  -- act
   self.handler:access({})
-  lu.assertTrue(self:log_contains("calling authenticate"))
+  
+  -- assert
+  lu.assertTrue(authenticate_called)
   lu.assertNil(headers['X-ID-Token'])
 end
 
 function TestHandler:test_authenticate_ok_with_idtoken()
+  -- arrange
+  local authenticate_called = false
   self.module_resty.openidc.authenticate = function(opts)
+    authenticate_called = true
     return {id_token = {sub = "sub"}}, true, "/", session
   end
 
@@ -122,62 +158,114 @@ function TestHandler:test_authenticate_ok_with_idtoken()
     headers[h] = v
   end
 
+  -- act
   self.handler:access({})
-  lu.assertTrue(self:log_contains("calling authenticate"))
+  
+  -- assert
+  lu.assertTrue(authenticate_called)
   lu.assertEquals(headers['X-ID-Token'], "eyJzdWIiOiJzdWIifQ==")
 end
 
-function TestHandler:test_authenticate_nok_no_recovery()
+function TestHandler:test_authenticate_error_no_recovery()
+  -- arrange
+  local statusCode = nil
+  local authenticate_called = false
+  package.loaded["kong.plugins.oidc.utils"].exit = function(httpStatusCode, message, ngxCode)
+    statusCode = httpStatusCode
+  end
   self.module_resty.openidc.authenticate = function(opts)
+    authenticate_called = true
     return {}, true, "/", session
   end
-
+  
+  -- act
   self.handler:access({})
-  lu.assertTrue(self:log_contains("calling authenticate"))
+  
+  -- assert
+  lu.assertTrue(authenticate_called)
+  lu.assertEquals(statusCode, 500)
 end
 
--- fix heree
 function TestHandler:test_authenticate_nok_with_recovery()
+  -- arrange
+  local redirect = nil
+  ngx.redirect = function(path)
+    redirect = path
+  end
   self.module_resty.openidc.authenticate = function(opts)
     return {}, true, "/", session
   end
 
+  -- aact
   self.handler:access({recovery_page_path = "x"})
-  lu.assertTrue(self:log_contains("recovery page"))
+
+  -- arrange
+  lu.assertEquals(redirect, "x")
 end
 
-function TestHandler:test_introspect_ok_no_userinfo()
+function TestHandler:test_introspect_called_when_bearer_token()
+  -- arrange
+  local instrospect_called = false
   self.module_resty.openidc.introspect = function(opts)
+    instrospect_called = true
     return false, false
   end
   ngx.req.get_headers = function() return {Authorization = "Bearer xxx"} end
 
+  -- act
   self.handler:access({introspection_endpoint = "x"})
-  lu.assertTrue(self:log_contains("introspect succeeded"))
+  
+  -- assert
+  lu.assertTrue(instrospect_called)
 end
 
 function TestHandler:test_introspect_ok_with_userinfo()
-  self.module_resty.openidc.introspect = function(opts)
-    return {}, false
-  end
+  -- arrange
+  local called_userinfo_endpoint = false
+  local userinfo_to_be_encoded = nil
+  local instrospect_called = false
+
   ngx.req.get_headers = function() return {Authorization = "Bearer xxx"} end
-
-  ngx.encode_base64 = function(x)
-    return "eyJzdWIiOiJzdWIifQ=="
-  end
-
+  
   local headers = {}
   ngx.req.set_header = function(h, v)
     headers[h] = v
   end
 
+  self.module_resty.openidc.introspect = function(opts)
+    instrospect_called = true
+    return {}, false
+  end
+
+  self.module_resty.openidc.call_userinfo_endpoint = function(...)
+    called_userinfo_endpoint = true
+    return { email = "test@gmail.com", email_verified = true }
+  end
+
+  package.loaded.cjson.encode = function(x)
+    userinfo_to_be_encoded = x
+  end
+
+  ngx.encode_base64 = function(x)
+    return "eyJzdWIiOiJzdWIifQ=="
+  end
+
+  -- act
   self.handler:access({introspection_endpoint = "x"})
-  lu.assertTrue(self:log_contains("introspect succeeded"))
+
+  -- assert
+  lu.assertTrue(instrospect_called)
+  lu.assertTrue(called_userinfo_endpoint)
+  lu.assertEquals(userinfo_to_be_encoded.email, "test@gmail.com")
   lu.assertEquals(headers['X-Userinfo'], "eyJzdWIiOiJzdWIifQ==")
+  lu.assertEquals(headers['X-Access-Token'], 'xxx')
 end
 
 function TestHandler:test_bearer_only_with_good_token()
+  -- arrange
+  local introspect_called = false
   self.module_resty.openidc.introspect = function(opts)
+    introspect_called = true
     return {sub = "sub", exp = 1589290625}, false
   end
   ngx.req.get_headers = function() return {Authorization = "Bearer xxx"} end
@@ -191,22 +279,30 @@ function TestHandler:test_bearer_only_with_good_token()
     headers[h] = v
   end
 
+  -- act
   self.handler:access({introspection_endpoint = "x", bearer_only = "yes", realm = "kong"})
-  lu.assertTrue(self:log_contains("introspect succeeded"))
+  
+  -- assert
+  lu.assertTrue(introspect_called)
   lu.assertEquals(headers['X-Userinfo'], "eyJzdWIiOiJzdWIifQ==")
 end
 
 function TestHandler:test_bearer_only_with_bad_token()
+  -- arrange
+  local introspect_called = false
   self.module_resty.openidc.introspect = function(opts)
+    introspect_called = true
     return {}, "validation failed"
   end
   ngx.req.get_headers = function() return {Authorization = "Bearer xxx"} end
 
+  -- act
   self.handler:access({introspection_endpoint = "x", bearer_only = "yes", realm = "kong"})
 
+  -- assert
+  lu.assertTrue(introspect_called)
   lu.assertEquals(ngx.header["WWW-Authenticate"], 'Bearer realm="kong",error="validation failed"')
   lu.assertEquals(ngx.status, ngx.HTTP_UNAUTHORIZED)
-  lu.assertFalse(self:log_contains("introspect succeeded"))
 end
 
 function TestHandler:test_authenticate_ok_with_login_hint()
