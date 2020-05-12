@@ -1,18 +1,33 @@
 local lu = require("luaunit")
 TestHandler = require("test.unit.mockable_case"):extend()
+local session = nil;
 
 
 function TestHandler:setUp()
   TestHandler.super:setUp()
 
+  session = {
+    close = function(...) end
+  }
+
   package.loaded["resty.openidc"] = nil
-  self.module_resty = {openidc = {
-    authenticate = function(...) return {}, nil end }
+  self.module_resty = {
+    openidc = {
+      authenticate = function(...)
+        return {}, nil, "/", session
+      end,
+      call_userinfo_endpoint = function(...)
+        return { email = "test@gmail.com" }
+      end
+    }
   }
   package.preload["resty.openidc"] = function()
     return self.module_resty.openidc
   end
 
+  -- todo: can we simplify this?
+  -- reload kong.plugins.oidc.handler to force reload of resty.openidc
+  package.loaded["kong.plugins.oidc.handler"] = nil
   self.handler = require("kong.plugins.oidc.handler")()
 end
 
@@ -22,7 +37,7 @@ end
 
 function TestHandler:test_authenticate_ok_no_userinfo()
   self.module_resty.openidc.authenticate = function(opts)
-    return {}, false
+    return {}, false, "/", session
   end
 
   self.handler:access({})
@@ -31,7 +46,7 @@ end
 
 function TestHandler:test_authenticate_ok_with_userinfo()
   self.module_resty.openidc.authenticate = function(opts)
-    return {user = {sub = "sub"}}, false
+    return {user = {sub = "sub"}}, false, "/", session
   end
   ngx.encode_base64 = function(x)
     return "eyJzdWIiOiJzdWIifQ=="
@@ -50,7 +65,7 @@ end
 
 function TestHandler:test_authenticate_ok_with_no_accesstoken()
   self.module_resty.openidc.authenticate = function(opts)
-    return {}, true
+    return {}, true, "/", session
   end
 
   local headers = {}
@@ -65,7 +80,7 @@ end
 
 function TestHandler:test_authenticate_ok_with_accesstoken()
   self.module_resty.openidc.authenticate = function(opts)
-    return {access_token = "ACCESS_TOKEN"}, true
+    return {access_token = "ACCESS_TOKEN"}, true, "/", session
   end
 
   local headers = {}
@@ -80,7 +95,7 @@ end
 
 function TestHandler:test_authenticate_ok_with_no_idtoken()
   self.module_resty.openidc.authenticate = function(opts)
-    return {}, true
+    return {}, true, "/", session
   end
 
   local headers = {}
@@ -95,7 +110,7 @@ end
 
 function TestHandler:test_authenticate_ok_with_idtoken()
   self.module_resty.openidc.authenticate = function(opts)
-    return {id_token = {sub = "sub"}}, true
+    return {id_token = {sub = "sub"}}, true, "/", session
   end
 
   ngx.encode_base64 = function(x)
@@ -114,16 +129,17 @@ end
 
 function TestHandler:test_authenticate_nok_no_recovery()
   self.module_resty.openidc.authenticate = function(opts)
-    return {}, true
+    return {}, true, "/", session
   end
 
   self.handler:access({})
   lu.assertTrue(self:log_contains("calling authenticate"))
 end
 
+-- fix heree
 function TestHandler:test_authenticate_nok_with_recovery()
   self.module_resty.openidc.authenticate = function(opts)
-    return {}, true
+    return {}, true, "/", session
   end
 
   self.handler:access({recovery_page_path = "x"})
@@ -162,7 +178,7 @@ end
 
 function TestHandler:test_bearer_only_with_good_token()
   self.module_resty.openidc.introspect = function(opts)
-    return {sub = "sub"}, false
+    return {sub = "sub", exp = 1589290625}, false
   end
   ngx.req.get_headers = function() return {Authorization = "Bearer xxx"} end
 
@@ -205,7 +221,7 @@ function TestHandler:test_authenticate_ok_with_login_hint()
 
   self.module_resty.openidc.authenticate = function(opts)
     auth_param_login_hint= opts.authorization_params.login_hint
-    return {}, true
+    return {}, true, "/", session
   end
 
   -- act
@@ -230,7 +246,7 @@ function TestHandler:test_authenticate_ok_with_xmlhttprequest()
   -- mock authenticate to be able to check unauth_action
   self.module_resty.openidc.authenticate = function(opts, target_url, unauth_action)
     actual_unauth_action = unauth_action
-    return {}, false
+    return {}, false, "/", session
   end
 
   -- act
@@ -253,7 +269,7 @@ function TestHandler:test_authenticate_nok_with_xmlhttprequest()
 
   -- mock authenticate to be able to check unauth_action
   self.module_resty.openidc.authenticate = function(opts, target_url, unauth_action)
-    return {}, "unauthorized request"
+    return {}, "unauthorized request", "/", session
   end
 
   -- act
@@ -274,11 +290,11 @@ function TestHandler:test_authenticate_with_session_cookie_samesite_set_to_none(
     }
   }
 
-  local session = nil;
+  local v = nil;
 
   self.module_resty.openidc.authenticate = function(opts, target_url, unauth_action, session_opts)
-    session = session_opts
-    return {}, true
+    v = session_opts
+    return {}, true, "/", session
   end
 
 
@@ -286,7 +302,7 @@ function TestHandler:test_authenticate_with_session_cookie_samesite_set_to_none(
   self.handler:access(opts)
 
   -- assert
-  lu.assertItemsEquals(session, opts.session)
+  lu.assertItemsEquals(v, opts.session)
 end
 
 lu.run()
