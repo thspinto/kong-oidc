@@ -37,9 +37,19 @@ function handle(oidcConfig, oidcSessionConfig)
     -- if response, then introspect successful
     if response then
       local access_token = utils.get_bearer_access_token_from_header(oidcConfig)
-      local user_info = get_user_info(oidcConfig, response)
-      response.access_token = access_token
-      response.user = user_info
+      local user_info, err = get_userinfo(oidcConfig, response)
+      
+      -- introspect passed but userinfo call failed, maybe we have id_token
+      if err then
+        ngx.log(ngx.DEBUG, "call to userinfo endpoint failed, attaching decoded token to user")
+        user_info = response
+      end
+      
+      response = {
+        access_token = access_token,
+        user = user_info
+      }
+
     end
   end
 
@@ -135,7 +145,7 @@ function introspect(oidcConfig)
   return nil
 end
 
-function get_user_info(oidcConfig, introspect_response)
+function get_userinfo(oidcConfig, introspect_response)
   local access_token = utils.get_bearer_access_token_from_header(oidcConfig)
   -- todo: add tests to verify cache hit
   local user_info = utils.cache_get("userinfo", access_token)
@@ -147,6 +157,7 @@ function get_user_info(oidcConfig, introspect_response)
     user_info, err = openidc.call_userinfo_endpoint(oidcConfig, access_token)
     
     if err then
+      ngx.log(ngx.ERR, "call to userinfo endpoint failed, ", err)
       return nil, err
     end
 
