@@ -64,6 +64,18 @@ You also need to set the `KONG_PLUGINS` environment variable
 
      export KONG_PLUGINS=oidc
 
+### Caching
+
+This plugin and `lua-resty-openidc` luarocks package utilizes the http `lua_shared_dict` directive for caching. Thus to utilize this plugin effectively, please review the following sample configurations for nginx:
+* [https://github.com/zmartzone/lua-resty-openidc#sample-configuration-for-google-signin](https://github.com/zmartzone/lua-resty-openidc#sample-configuration-for-google-signin)
+* [https://github.com/zmartzone/lua-resty-openidc#sample-configuration-for-pingfederate-oauth-20](https://github.com/zmartzone/lua-resty-openidc#sample-configuration-for-pingfederate-oauth-20)
+
+For full support and functionality you should have a `lua_shared_dict` with the following names:
+- introspection
+- discovery
+- jwks
+- userinfo
+
 ## Usage
 
 ### Parameters
