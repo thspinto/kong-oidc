@@ -5,6 +5,15 @@ TestIntrospect = require("test.unit.mockable_case"):extend()
 
 function TestIntrospect:setUp()
   TestIntrospect.super:setUp()
+  package.loaded["resty.openidc"] = nil
+  package.preload["resty.openidc"] = function() 
+    return {
+      call_userinfo_endpoint = function(...)
+        return { email = "test@gmail.net" }
+      end
+    } 
+  end
+  package.loaded["kong.plugins.oidc.handler"] = nil
   self.handler = require("kong.plugins.oidc.handler")()
 end
 
@@ -13,6 +22,7 @@ function TestIntrospect:tearDown()
 end
 
 function TestIntrospect:test_access_token_exists()
+  package.loaded["resty.openidc"].introspect = function(...) return {}, nil end
   ngx.req.get_headers = function() return {Authorization = "Bearer xxx"} end
   local dict = {}
   function dict:get(key) return key end
@@ -33,7 +43,7 @@ function TestIntrospect:test_access_token_exists()
 end
 
 function TestIntrospect:test_no_authorization_header()
-  package.loaded["resty.openidc"].authenticate = function(...) return {}, nil end
+  package.loaded["resty.openidc"].authenticate = function(...) return {}, nil, "/", { close = function() end } end
   ngx.req.get_headers = function() return {} end
 
   local headers = {}

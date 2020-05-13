@@ -8,6 +8,7 @@ function MockableCase:setUp()
   self.mocked_ngx = {
     DEBUG = "debug",
     ERR = "error",
+    INFO = "info",
     HTTP_UNAUTHORIZED = 401,
     ctx = {},
     header = {},
@@ -19,14 +20,21 @@ function MockableCase:setUp()
     },
     log = function(...)
       self.logs[#self.logs+1] = table.concat({...}, " ")
-      print("ngx.log: ", self.logs[#self.logs])
+      -- print("ngx.log: ", self.logs[#self.logs])
     end,
     say = function(...) end,
     exit = function(...) end,
     redirect = function(...) end,
     config = {
       subsystem = "http"
-    }
+    },
+    shared = {
+      userinfo = {
+        get = function(...) return nil end,
+        set = function(...) return nil end
+      }
+    },
+    time = function() return 1589290000 end
   }
   self.ngx = _G.ngx
   _G.ngx = self.mocked_ngx
