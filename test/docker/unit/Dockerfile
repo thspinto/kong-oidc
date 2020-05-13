@@ -14,7 +14,7 @@ RUN luarocks install luaunit
 RUN luarocks install lua-cjson
 
 # Change openidc version when version in rockspec changes
-RUN luarocks install lua-resty-openidc
+RUN luarocks install lua-resty-openidc 1.7.2
 
 WORKDIR /usr/local/kong-oidc
 
