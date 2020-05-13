@@ -1,8 +1,8 @@
 package = "kong-oidc"
-version = "1.5.2"
+version = "1.6.0"
 source = {
     url = "git://github.com/skylineos/kong-oidc",
-    tag = "v1.5.2",
+    tag = "v1.6.0",
     dir = "kong-oidc"
 }
 description = {
@@ -22,7 +22,7 @@ description = {
     license = "Apache 2.0"
 }
 dependencies = {
-    "lua-resty-openidc ~> 1.6.1-1"
+    "lua-resty-openidc ~> 1.6.1"
 }
 build = {
     type = "builtin",
