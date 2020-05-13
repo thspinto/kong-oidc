@@ -37,17 +37,19 @@ function handle(oidcConfig, oidcSessionConfig)
     -- if response, then introspect successful
     if response then
       local access_token = utils.get_bearer_access_token_from_header(oidcConfig)
-      local user_info, err = get_userinfo(oidcConfig, response)
+      local userinfo, err = get_userinfo(oidcConfig, response)
       
-      -- introspect passed but userinfo call failed, maybe we have id_token
+      -- @todo: how can we distinguish between access_token and id_token?
+      -- err can occur due to id_token being used for authorization header instead of access_token
       if err then
         ngx.log(ngx.DEBUG, "call to userinfo endpoint failed, attaching decoded token to user")
-        user_info = response
+        -- introspect passed but userinfo failed, set userinfo to decoded token instead of leaving blank
+        userinfo = response
       end
       
       response = {
         access_token = access_token,
-        user = user_info
+        user = userinfo
       }
 
     end
@@ -148,46 +150,47 @@ end
 function get_userinfo(oidcConfig, introspect_response)
   local access_token = utils.get_bearer_access_token_from_header(oidcConfig)
   -- todo: add tests to verify cache hit
-  local user_info = utils.cache_get("userinfo", access_token)
+  local userinfo = utils.cache_get("userinfo", access_token)
   local err = nil
+
+  -- cache hit
+  if userinfo then
+    return cjson.decode(userinfo)
+  end
   
-  -- cache miss
-  if not user_info then
-    ngx.log(ngx.INFO, "userinfo cache miss, calling userinfo endpoint")
-    user_info, err = openidc.call_userinfo_endpoint(oidcConfig, access_token)
-    
-    if err then
-      ngx.log(ngx.ERR, "call to userinfo endpoint failed, ", err)
-      return nil, err
-    end
-
-    -- todo: add tests to verify values are respected
-    local introspection_cache_ignore = oidcConfig.introspection_cache_ignore or false
-    local expiry_claim = oidcConfig.introspection_expiry_claim or "exp"
-    local introspection_interval = oidcConfig.introspection_interval or 0
-    
-    if not introspection_cache_ignore and introspect_response[expiry_claim] then
-      local ttl = introspect_response[expiry_claim]
-      ngx.log(ngx.INFO, ttl)
-
-      if expiry_claim == "exp" then --https://tools.ietf.org/html/rfc7662#section-2.2
-        ttl = ttl - ngx.time()
-      end
-      if introspection_interval > 0 then
-        if ttl > introspection_interval then
-          ttl = introspection_interval
-        end
-      end
-      ngx.log(ngx.INFO, "setting cache now")
-      ngx.log(ngx.INFO, "cach ttl: " .. ttl)
-      utils.cache_set("userinfo", access_token, cjson.encode(user_info), ttl)
-    end
-
-  else
-    user_info = cjson.decode(user_info)
+  ngx.log(ngx.INFO, "userinfo cache miss, calling userinfo endpoint")
+  userinfo, err = openidc.call_userinfo_endpoint(oidcConfig, access_token)
+  
+  if err then
+    ngx.log(ngx.ERR, "call to userinfo endpoint failed, ", err)
+    return nil, err
   end
 
-  return user_info
+  -- @see openidc.introspect https://github.com/zmartzone/lua-resty-openidc/blob/master/lib/resty/openidc.lua#L1575
+  -- utilized openidc.introspect caching logic 
+  -- todo: add tests to verify values are respected
+  local introspection_cache_ignore = oidcConfig.introspection_cache_ignore or false
+  local expiry_claim = oidcConfig.introspection_expiry_claim or "exp"
+  local introspection_interval = oidcConfig.introspection_interval or 0
+  
+  if not introspection_cache_ignore and introspect_response[expiry_claim] then
+    local ttl = introspect_response[expiry_claim]
+    ngx.log(ngx.INFO, ttl)
+
+    if expiry_claim == "exp" then --https://tools.ietf.org/html/rfc7662#section-2.2
+      ttl = ttl - ngx.time()
+    end
+    if introspection_interval > 0 then
+      if ttl > introspection_interval then
+        ttl = introspection_interval
+      end
+    end
+    ngx.log(ngx.INFO, "setting cache now")
+    ngx.log(ngx.INFO, "cach ttl: " .. ttl)
+    utils.cache_set("userinfo", access_token, cjson.encode(userinfo), ttl)
+  end
+
+  return userinfo
 end
 
 

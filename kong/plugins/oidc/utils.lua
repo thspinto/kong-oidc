@@ -110,6 +110,7 @@ function M.get_bearer_access_token_from_header(opts)
   return access_token, err
 end
 
+-- @see openidc_cache_set https://github.com/zmartzone/lua-resty-openidc/blob/master/lib/resty/openidc.lua#L101
 function M.cache_set(type, key, value, exp)
   local dict = ngx.shared[type]
   if dict and (exp > 0) then
@@ -118,6 +119,7 @@ function M.cache_set(type, key, value, exp)
   end
 end
 
+-- @see openidc_cache_get https://github.com/zmartzone/lua-resty-openidc/blob/master/lib/resty/openidc.lua#L110
 function M.cache_get(type, key)
   local dict = ngx.shared[type]
   local value
