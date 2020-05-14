@@ -25,7 +25,6 @@ function M.get_options(config, ngx)
     client_id = config.client_id,
     client_secret = config.client_secret,
     discovery = discovery,
-    introspection_endpoint = config.introspection_endpoint,
     timeout = config.timeout,
     introspection_endpoint_auth_method = config.introspection_endpoint_auth_method,
     introspection_expiry_claim = config.introspection_expiry_claim,

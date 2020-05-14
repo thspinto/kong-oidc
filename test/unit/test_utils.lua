@@ -17,7 +17,6 @@ function TestUtils:setUp()
       ssl_verify = "no",
       token_endpoint_auth_method = "client_secret_post",
       introspection_endpoint_auth_method = "client_secret_basic",
-      introspection_endpoint = "https://domain.com/oauth2/v1/introspect",
       introspection_expiry_claim = "expires",
       introspection_cache_ignore = false,
       introspection_interval = 600,
@@ -52,7 +51,6 @@ function TestUtils:testOptions()
   lu.assertEquals(opts.ssl_verify, "no")
   lu.assertEquals(opts.token_endpoint_auth_method, "client_secret_post")
   lu.assertEquals(opts.introspection_endpoint_auth_method, "client_secret_basic")
-  lu.assertEquals(opts.introspection_endpoint, "https://domain.com/oauth2/v1/introspect")
   lu.assertEquals(opts.introspection_expiry_claim, "expires")
   lu.assertEquals(opts.introspection_cache_ignore, false)
   lu.assertEquals(opts.introspection_interval, 600)

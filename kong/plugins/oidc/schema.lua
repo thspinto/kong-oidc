@@ -10,9 +10,9 @@ return {
         fields = {
           { client_id = { type = "string", required = true } },
           { client_secret = { type = "string", required = true } },
+          -- @todo: should discovery be required, since we allow override?
           { discovery = { type = "string", required = true, default = "https://.well-known/openid-configuration" } },
           { introspection_endpoint_auth_method = { type = "string", required = false } },
-          { introspection_endpoint = { type = "string", required = false } },
           { introspection_expiry_claim = { type = "string", required = false } },
           { introspection_cache_ignore = { type = "boolean", required = false } },
           { introspection_interval = { type = "number", required = false } },

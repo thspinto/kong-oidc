@@ -31,8 +31,11 @@ end
 function handle(oidcConfig, oidcSessionConfig)
   local response
 
+  -- get/cache discovery data, mutate oidcConfig.discovery if it is a string (discovery endpoint)
+  openidc.get_discovery_doc(oidcConfig)
+
   -- attempt introspection of potential bearer token
-  if oidcConfig.introspection_endpoint then
+  if oidcConfig.discovery.introspection_endpoint then
     response = introspect(oidcConfig)
     -- if response, then introspect successful
     if response then
@@ -166,8 +169,6 @@ function get_userinfo(oidcConfig, introspect_response)
     return userinfo
   end
   
-  -- @note: remove call to get_discovery_doc when next patch of lua-resty-openidc is ready
-  openidc.get_discovery_doc(oidcConfig)
   ngx.log(ngx.INFO, "userinfo cache miss, calling userinfo endpoint")
   userinfo, err = openidc.call_userinfo_endpoint(oidcConfig, access_token)
   
