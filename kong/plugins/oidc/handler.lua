@@ -41,7 +41,7 @@ function handle(oidcConfig, oidcSessionConfig)
       
       -- @todo: how can we distinguish between access_token and id_token?
       -- err can occur due to id_token being used for authorization header instead of access_token
-      if err then
+      if err or not userinfo then
         ngx.log(ngx.DEBUG, "call to userinfo endpoint failed, attaching decoded token to user")
         -- introspect passed but userinfo failed, set userinfo to decoded token instead of leaving blank
         userinfo = response
@@ -155,9 +155,19 @@ function get_userinfo(oidcConfig, introspect_response)
 
   -- cache hit
   if userinfo then
-    return cjson.decode(userinfo)
+    userinfo = cjson.decode(userinfo)
+    
+    -- check if decoded value is blank
+    if userinfo == cjson.null then
+      ngx.log(ngx.DEBUG, "userinfo cached value is null returning nil value")
+      return nil
+    end
+
+    return userinfo
   end
   
+  -- @note: remove call to get_discovery_doc when next patch of lua-resty-openidc is ready
+  openidc.get_discovery_doc(oidcConfig)
   ngx.log(ngx.INFO, "userinfo cache miss, calling userinfo endpoint")
   userinfo, err = openidc.call_userinfo_endpoint(oidcConfig, access_token)
   

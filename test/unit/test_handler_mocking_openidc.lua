@@ -21,6 +21,9 @@ function TestHandler:setUp()
       end,
       call_userinfo_endpoint = function(...)
         return { email = "test@gmail.com" }
+      end,
+      get_discovery_doc = function(...)
+        return {}
       end
     }
   }

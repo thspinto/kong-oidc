@@ -10,6 +10,9 @@ function TestIntrospect:setUp()
     return {
       call_userinfo_endpoint = function(...)
         return { email = "test@gmail.net" }
+      end,
+      get_discovery_doc = function(...)
+        return {}
       end
     } 
   end
