@@ -10,6 +10,9 @@ function TestIntrospect:setUp()
     return {
       call_userinfo_endpoint = function(...)
         return { email = "test@gmail.net" }
+      end,
+      get_discovery_doc = function(opts)
+        opts.discovery = { introspection_endpoint = "x" }
       end
     } 
   end
@@ -37,7 +40,7 @@ function TestIntrospect:test_access_token_exists()
     headers[h] = v
   end
 
-  self.handler:access({introspection_endpoint = "x"})
+  self.handler:access({})
   lu.assertTrue(self:log_contains("introspect succeeded"))
   lu.assertEquals(headers['X-Userinfo'], "eyJzdWIiOiJzdWIifQ==")
 end
@@ -51,7 +54,7 @@ function TestIntrospect:test_no_authorization_header()
     headers[h] = v
   end
 
-  self.handler:access({introspection_endpoint = "x"})
+  self.handler:access({})
   lu.assertFalse(self:log_contains(self.mocked_ngx.ERR))
   lu.assertEquals(headers['X-Userinfo'], nil)
 end

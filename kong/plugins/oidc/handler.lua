@@ -31,8 +31,11 @@ end
 function handle(oidcConfig, oidcSessionConfig)
   local response
 
+  -- get/cache discovery data, mutate oidcConfig.discovery if it is a string (discovery endpoint)
+  openidc.get_discovery_doc(oidcConfig)
+
   -- attempt introspection of potential bearer token
-  if oidcConfig.introspection_endpoint then
+  if oidcConfig.discovery.introspection_endpoint then
     response = introspect(oidcConfig)
     -- if response, then introspect successful
     if response then
@@ -41,7 +44,7 @@ function handle(oidcConfig, oidcSessionConfig)
       
       -- @todo: how can we distinguish between access_token and id_token?
       -- err can occur due to id_token being used for authorization header instead of access_token
-      if err then
+      if err or not userinfo then
         ngx.log(ngx.DEBUG, "call to userinfo endpoint failed, attaching decoded token to user")
         -- introspect passed but userinfo failed, set userinfo to decoded token instead of leaving blank
         userinfo = response
@@ -155,7 +158,15 @@ function get_userinfo(oidcConfig, introspect_response)
 
   -- cache hit
   if userinfo then
-    return cjson.decode(userinfo)
+    userinfo = cjson.decode(userinfo)
+    
+    -- check if decoded value is blank
+    if userinfo == cjson.null then
+      ngx.log(ngx.DEBUG, "userinfo cached value is null returning nil value")
+      return nil
+    end
+
+    return userinfo
   end
   
   ngx.log(ngx.INFO, "userinfo cache miss, calling userinfo endpoint")

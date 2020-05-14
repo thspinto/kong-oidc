@@ -17,6 +17,9 @@ function TestUtils:setUp()
       ssl_verify = "no",
       token_endpoint_auth_method = "client_secret_post",
       introspection_endpoint_auth_method = "client_secret_basic",
+      introspection_expiry_claim = "expires",
+      introspection_cache_ignore = false,
+      introspection_interval = 600,
       filters = "pattern1,pattern2,pattern3",
       logout_path = "/logout",
       redirect_uri = "http://domain.com/auth/callback",
@@ -48,6 +51,9 @@ function TestUtils:testOptions()
   lu.assertEquals(opts.ssl_verify, "no")
   lu.assertEquals(opts.token_endpoint_auth_method, "client_secret_post")
   lu.assertEquals(opts.introspection_endpoint_auth_method, "client_secret_basic")
+  lu.assertEquals(opts.introspection_expiry_claim, "expires")
+  lu.assertEquals(opts.introspection_cache_ignore, false)
+  lu.assertEquals(opts.introspection_interval, 600)
   lu.assertItemsEquals(opts.filters, expectedFilters)
   lu.assertEquals(opts.logout_path, "/logout")
   lu.assertEquals(opts.redirect_uri, "http://domain.com/auth/callback")

@@ -21,6 +21,10 @@ function TestHandler:setUp()
       end,
       call_userinfo_endpoint = function(...)
         return { email = "test@gmail.com" }
+      end,
+      get_discovery_doc = function(opts)
+        opts.discovery = opts.discovery or {}
+        return opts
       end
     }
   }
@@ -213,7 +217,7 @@ function TestHandler:test_introspect_called_when_bearer_token()
   ngx.req.get_headers = function() return {Authorization = "Bearer xxx"} end
 
   -- act
-  self.handler:access({introspection_endpoint = "x"})
+  self.handler:access({discovery = { introspection_endpoint = "x" }})
   
   -- assert
   lu.assertTrue(instrospect_called)
@@ -251,7 +255,7 @@ function TestHandler:test_introspect_ok_with_userinfo()
   end
 
   -- act
-  self.handler:access({introspection_endpoint = "x"})
+  self.handler:access({ discovery = { introspection_endpoint = "x" }})
 
   -- assert
   lu.assertTrue(instrospect_called)
@@ -280,7 +284,7 @@ function TestHandler:test_bearer_only_with_good_token()
   end
 
   -- act
-  self.handler:access({introspection_endpoint = "x", bearer_only = "yes", realm = "kong"})
+  self.handler:access({ discovery = { introspection_endpoint = "x" }, bearer_only = "yes", realm = "kong"})
   
   -- assert
   lu.assertTrue(introspect_called)
@@ -297,7 +301,7 @@ function TestHandler:test_bearer_only_with_bad_token()
   ngx.req.get_headers = function() return {Authorization = "Bearer xxx"} end
 
   -- act
-  self.handler:access({introspection_endpoint = "x", bearer_only = "yes", realm = "kong"})
+  self.handler:access({ discovery = { introspection_endpoint = "x" }, bearer_only = "yes", realm = "kong"})
 
   -- assert
   lu.assertTrue(introspect_called)
