@@ -42,6 +42,7 @@ function M.get_options(config, ngx)
     filters = parseFilters(config.filters),
     logout_path = config.logout_path,
     redirect_after_logout_uri = config.redirect_after_logout_uri,
+    idp_authentication_path = config.idp_authentication_path
   }, config.session
 end
 
@@ -130,6 +131,12 @@ function M.cache_get(type, key)
     if value then ngx.log(ngx.DEBUG, "cache hit: type=" .. type .. " key=" .. key) end
   end
   return value
+end
+
+function M.clear_request_headers()
+  ngx.req.clear_header("X-Access-Token")
+  ngx.req.clear_header("X-ID-Token")
+  ngx.req.clear_header("X-Userinfo")
 end
 
 return M
