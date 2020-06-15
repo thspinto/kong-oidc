@@ -351,7 +351,7 @@ function TestHandler:test_authenticate_ok_with_xmlhttprequest()
   end
 
   -- act
-  self.handler:access({ idp_authentication_path = "/arbitrary/path"})
+  self.handler:access({ idp_authentication_path = idpAuthPath})
 
   -- assert
   lu.assertTrue(self:log_contains("ajax/async request detected"))
@@ -406,12 +406,10 @@ function TestHandler:test_authenticate_with_session_cookie_samesite_set_to_none(
   lu.assertItemsEquals(v, opts.session)
 end
 
-function TestHandler:test_authenticate_ok_with_auth_request()
+function TestHandler:test_authenticate_ok_to_idp_authentication_path()
   -- arrange
   local actual_unauth_action
-  kong.request.get_path = function()
-    return idpAuthPath
-  end
+  ngx.var.request_uri = idpAuthPath
 
   -- mock authenticate to be able to check unauth_action
   self.module_resty.openidc.authenticate = function(opts, target_url, unauth_action)
@@ -426,12 +424,9 @@ function TestHandler:test_authenticate_ok_with_auth_request()
   lu.assertEquals(actual_unauth_action, nil)
 end
 
-function TestHandler:test_authenticate_ok_with_api_request()
+function TestHandler:test_authenticate_ok_to_non_idp_authentication_path()
   -- arrange
   local actual_unauth_action
-  kong.request.get_path = function()
-    return publicRoute
-  end
 
   -- mock authenticate to be able to check unauth_action
   self.module_resty.openidc.authenticate = function(opts, target_url, unauth_action)
@@ -443,6 +438,33 @@ function TestHandler:test_authenticate_ok_with_api_request()
 
   -- assert
   lu.assertEquals(actual_unauth_action, "pass")
+end
+
+function TestHandler:test_authenticate_ok_to_idp_authentication_path()
+  -- arrange
+  local actual_unauth_action
+  ngx.var.request_uri = idpAuthPath
+
+  -- add XMLHttpRequest to headers
+  ngx.req.get_headers = function()
+    local headers = {}
+    headers["X-Requested-With"] = "XMLHttpRequest"
+    return headers
+  end
+
+  -- mock authenticate to be able to check unauth_action
+  self.module_resty.openidc.authenticate = function(opts, target_url, unauth_action)
+    actual_unauth_action = unauth_action
+    return {}, "unauthorized request", "/", session
+  end
+
+  -- act
+  self.handler:access({ idp_authentication_path = idpAuthPath})
+
+  -- assert
+  lu.assertTrue(self:log_contains("ajax/async request detected"))
+  lu.assertEquals(actual_unauth_action, "deny")
+  lu.assertEquals(ngx.status, ngx.HTTP_UNAUTHORIZED)
 end
 
 lu.run()

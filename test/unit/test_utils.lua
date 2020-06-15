@@ -9,29 +9,29 @@ TestUtils = require("test.unit.base_case"):extend()
 function TestUtils:setUp()
   -- reset opts_fixture
   opts_fixture = {
-      client_id = 1,
-      client_secret = 2,
-      discovery = "d",
-      scope = "openid",
-      response_type = "code",
-      ssl_verify = "no",
-      token_endpoint_auth_method = "client_secret_post",
-      introspection_endpoint_auth_method = "client_secret_basic",
-      introspection_expiry_claim = "expires",
-      introspection_cache_ignore = false,
-      introspection_interval = 600,
-      filters = "pattern1,pattern2,pattern3",
-      logout_path = "/logout",
-      redirect_uri = "http://domain.com/auth/callback",
-      redirect_after_logout_uri = "/login",
-      prompt = "login",
-      session = { cookie = { samesite = "None" } },
-    }
+    client_id = 1,
+    client_secret = 2,
+    discovery = "d",
+    scope = "openid",
+    response_type = "code",
+    ssl_verify = "no",
+    token_endpoint_auth_method = "client_secret_post",
+    introspection_endpoint_auth_method = "client_secret_basic",
+    introspection_expiry_claim = "expires",
+    introspection_cache_ignore = false,
+    introspection_interval = 600,
+    filters = "pattern1,pattern2,pattern3",
+    logout_path = "/logout",
+    redirect_uri = "http://domain.com/auth/callback",
+    redirect_after_logout_uri = "/login",
+    prompt = "login",
+    session = { cookie = { samesite = "None" } },
+  }
 
-    ngx = {
-      var = { request_uri = "/path"},
-      req = { get_uri_args = function() return nil end }
-    }
+  ngx = {
+    var = { request_uri = "/path"},
+    req = { get_uri_args = function() return nil end }
+  }
 end
 
 function TestUtils:testOptions()
@@ -75,6 +75,24 @@ function TestUtils:testDiscoveryOverride()
 
   -- assert
   lu.assertItemsEquals(opts.discovery, opts_fixture.discovery_override)
+end
+
+function TestUtils:testClearRequestHeaders()
+  local headers = {}
+
+  _G.ngx = {
+    req = {
+      clear_header = function(header)
+        headers[header] = true
+      end
+    }
+  }
+
+  utils.clear_request_headers()
+
+  lu.assertTrue(headers["X-Access-Token"])
+  lu.assertTrue(headers["X-ID-Token"])
+  lu.assertTrue(headers["X-Userinfo"])
 end
 
 lu.run()

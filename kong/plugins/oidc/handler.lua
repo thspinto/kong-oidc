@@ -7,9 +7,6 @@ local cjson = require("cjson")
 local openidc = require("resty.openidc")
 
 OidcHandler.PRIORITY = 1000
--- GET /api/groups
--- GET /api/users
--- GET /api/auth/bearer/login
 
 function OidcHandler:new()
   OidcHandler.super.new(self, "oidc")
@@ -33,7 +30,7 @@ end
 function handle(oidcConfig, oidcSessionConfig)
   local response
 
-  -- clear important request headers to prevent ability to provide them client side
+  -- clear oidc plugin headers to prevent spoofing of info to upstream api
   utils.clear_request_headers()
 
   -- get/cache discovery data, mutate oidcConfig.discovery if it is a string (discovery endpoint)
@@ -98,24 +95,18 @@ function make_oidc(oidcConfig, oidcSessionConfig)
     end
   end
 
-  -- unauth_action = pass (default)
-  -- unauth_action = nil for /api/auth/bearer/login
-  local unauth_action = "pass"
-  -- grab X-Requested-With Header to see if request was from browser/ajax
   local ngx_headers = ngx.req.get_headers()
+  local unauth_action = oidcConfig.idp_authentication_path and "pass" or nil
+
   -- @TODO: move the hard coded path to config file
-  if kong.request.get_path() == oidcConfig.idp_authentication_path then
+  if ngx_headers and ngx_headers["X-Requested-With"] == "XMLHttpRequest" then
+    -- reference: https://github.com/zmartzone/lua-resty-openidc/blob/master/lib/resty/openidc.lua#L1436
+    -- set to deny so resty.openidc returns instead of redirects (ends request)
+    ngx.log(ngx.DEBUG, "OidcHandler ajax/async request detected, setting unauth_action = deny")
+    unauth_action = "deny"
+  elseif ngx.var.request_uri == oidcConfig.idp_authentication_path then
     ngx.log(ngx.DEBUG, "OidcHandler login request detected, setting unauth_action = nil")
     unauth_action = nil
-  elseif ngx_headers then
-    local xhr_value = ngx_headers["X-Requested-With"]
-    -- was the request ajax/async?
-    if xhr_value == "XMLHttpRequest" then
-      -- reference: https://github.com/zmartzone/lua-resty-openidc/blob/master/lib/resty/openidc.lua#L1436
-      -- set to deny so resty.openidc returns instead of redirects (ends request)
-      ngx.log(ngx.DEBUG, "OidcHandler ajax/async request detected, setting unauth_action = deny")
-      unauth_action = "deny"
-    end
   end
 
 
