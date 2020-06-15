@@ -5,6 +5,14 @@ local MockableCase = BaseCase:extend()
 function MockableCase:setUp()
   MockableCase.super:setUp()
   self.logs = {}
+  self.mocked_kong = {
+    request = {
+      get_path = function(...) end
+    }
+  }
+  self.kong = _G.kong
+  _G.kong = self.mocked_kong
+
   self.mocked_ngx = {
     DEBUG = "debug",
     ERR = "error",
@@ -16,7 +24,8 @@ function MockableCase:setUp()
     req = {
       get_uri_args = function(...) end,
       set_header = function(...) end,
-      get_headers = function(...) end
+      get_headers = function(...) end,
+      clear_header = function(...) end
     },
     log = function(...)
       self.logs[#self.logs+1] = table.concat({...}, " ")

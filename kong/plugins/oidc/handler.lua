@@ -120,7 +120,6 @@ function make_oidc(oidcConfig, oidcSessionConfig)
 
 
   local res, err, original_url, session = openidc.authenticate(oidcConfig, nil, unauth_action, oidcSessionConfig)
-  ngx.log(ngx.DEBUG, err)
 
 
   -- @todo: add unit test to check for session:close()

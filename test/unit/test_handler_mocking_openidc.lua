@@ -1,7 +1,8 @@
 local lu = require("luaunit")
 TestHandler = require("test.unit.mockable_case"):extend()
 local session = nil;
-
+local idpAuthPath = "/path/to/idp/authentication"
+local publicRoute = "/this/route/is/publicly/accessible"
 
 function TestHandler:setUp()
   TestHandler.super:setUp()
@@ -75,7 +76,7 @@ function TestHandler:test_authenticate_ok_with_userinfo()
 
   -- act
   self.handler:access({})
-  
+
   -- assert
   lu.assertTrue(authenticate_called)
   lu.assertEquals(ngx.ctx.authenticated_credential.id, "sub")
@@ -97,7 +98,7 @@ function TestHandler:test_authenticate_ok_with_no_accesstoken()
 
   -- act
   self.handler:access({})
-  
+
   -- assert
   lu.assertTrue(authenticate_called)
   lu.assertNil(headers['X-Access-Token'])
@@ -118,7 +119,7 @@ function TestHandler:test_authenticate_ok_with_accesstoken()
 
   -- act
   self.handler:access({})
-  
+
   -- assert
   lu.assertTrue(authenticate_called)
   lu.assertEquals(headers['X-Access-Token'], "ACCESS_TOKEN")
@@ -139,7 +140,7 @@ function TestHandler:test_authenticate_ok_with_no_idtoken()
 
   -- act
   self.handler:access({})
-  
+
   -- assert
   lu.assertTrue(authenticate_called)
   lu.assertNil(headers['X-ID-Token'])
@@ -164,7 +165,7 @@ function TestHandler:test_authenticate_ok_with_idtoken()
 
   -- act
   self.handler:access({})
-  
+
   -- assert
   lu.assertTrue(authenticate_called)
   lu.assertEquals(headers['X-ID-Token'], "eyJzdWIiOiJzdWIifQ==")
@@ -181,10 +182,10 @@ function TestHandler:test_authenticate_error_no_recovery()
     authenticate_called = true
     return {}, true, "/", session
   end
-  
+
   -- act
   self.handler:access({})
-  
+
   -- assert
   lu.assertTrue(authenticate_called)
   lu.assertEquals(statusCode, 500)
@@ -218,7 +219,7 @@ function TestHandler:test_introspect_called_when_bearer_token()
 
   -- act
   self.handler:access({discovery = { introspection_endpoint = "x" }})
-  
+
   -- assert
   lu.assertTrue(instrospect_called)
 end
@@ -230,7 +231,7 @@ function TestHandler:test_introspect_ok_with_userinfo()
   local instrospect_called = false
 
   ngx.req.get_headers = function() return {Authorization = "Bearer xxx"} end
-  
+
   local headers = {}
   ngx.req.set_header = function(h, v)
     headers[h] = v
@@ -285,7 +286,7 @@ function TestHandler:test_bearer_only_with_good_token()
 
   -- act
   self.handler:access({ discovery = { introspection_endpoint = "x" }, bearer_only = "yes", realm = "kong"})
-  
+
   -- assert
   lu.assertTrue(introspect_called)
   lu.assertEquals(headers['X-Userinfo'], "eyJzdWIiOiJzdWIifQ==")
@@ -350,7 +351,7 @@ function TestHandler:test_authenticate_ok_with_xmlhttprequest()
   end
 
   -- act
-  self.handler:access({})
+  self.handler:access({ idp_authentication_path = "/arbitrary/path"})
 
   -- assert
   lu.assertTrue(self:log_contains("ajax/async request detected"))
@@ -403,6 +404,45 @@ function TestHandler:test_authenticate_with_session_cookie_samesite_set_to_none(
 
   -- assert
   lu.assertItemsEquals(v, opts.session)
+end
+
+function TestHandler:test_authenticate_ok_with_auth_request()
+  -- arrange
+  local actual_unauth_action
+  kong.request.get_path = function()
+    return idpAuthPath
+  end
+
+  -- mock authenticate to be able to check unauth_action
+  self.module_resty.openidc.authenticate = function(opts, target_url, unauth_action)
+    actual_unauth_action = unauth_action
+    return {}, false, "/", session
+  end
+  -- act
+  self.handler:access({ idp_authentication_path = idpAuthPath })
+
+  -- assert
+  lu.assertTrue(self:log_contains("login request detected"))
+  lu.assertEquals(actual_unauth_action, nil)
+end
+
+function TestHandler:test_authenticate_ok_with_api_request()
+  -- arrange
+  local actual_unauth_action
+  kong.request.get_path = function()
+    return publicRoute
+  end
+
+  -- mock authenticate to be able to check unauth_action
+  self.module_resty.openidc.authenticate = function(opts, target_url, unauth_action)
+    actual_unauth_action = unauth_action
+    return {}, false, "/", session
+  end
+  -- act
+  self.handler:access({ idp_authentication_path = idpAuthPath })
+
+  -- assert
+  lu.assertEquals(actual_unauth_action, "pass")
 end
 
 lu.run()
