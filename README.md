@@ -174,7 +174,7 @@ The `force_authentication_path` variable should be a *string* relative url path 
 
 The following diagram illustrates how the behavior of **kong-oidc** plugin when the parameter `force_authentication_path` is set.
 
-![alt Kong OIDC pass flow](docs/kong_oidc_pass_flow.png)
+![alt Kong OIDC force authentication path](docs/kong_oidc_force_auth_path.png)
 
 ### Enabling
 
