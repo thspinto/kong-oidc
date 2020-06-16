@@ -1,5 +1,6 @@
 local utils = require("kong.plugins.oidc.utils")
 local lu = require("luaunit")
+local constants = require("kong.plugins.oidc.util.constants")
 -- opts_fixture, ngx are global to prevent mutation in consecutive tests
 local opts_fixture = nil
 
@@ -94,9 +95,9 @@ function TestUtils:testClearRequestHeaders()
   utils.clear_request_headers()
 
   -- assert
-  lu.assertTrue(headers["X-Access-Token"])
-  lu.assertTrue(headers["X-ID-Token"])
-  lu.assertTrue(headers["X-Userinfo"])
+  lu.assertTrue(headers[constants.REQUEST_HEADERS.X_ACCESS_TOKEN])
+  lu.assertTrue(headers[constants.REQUEST_HEADERS.X_ID_TOKEN])
+  lu.assertTrue(headers[constants.REQUEST_HEADERS.X_USERINFO])
 end
 
 lu.run()

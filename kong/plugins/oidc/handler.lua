@@ -5,6 +5,7 @@ local filter = require("kong.plugins.oidc.filter")
 local session = require("kong.plugins.oidc.session")
 local cjson = require("cjson")
 local openidc = require("resty.openidc")
+local constants = require("kong.plugins.oidc.util.constants")
 
 OidcHandler.PRIORITY = 1000
 
@@ -96,16 +97,23 @@ function make_oidc(oidcConfig, oidcSessionConfig)
   end
 
   local ngx_headers = ngx.req.get_headers()
-  local unauth_action = oidcConfig.force_authentication_path and "pass" or nil
+  local unauth_action
 
+  -- If the request is an ajax request, set unauth_action to deny (don't redirect user if authentication fails)
   if ngx_headers and ngx_headers["X-Requested-With"] == "XMLHttpRequest" then
     -- reference: https://github.com/zmartzone/lua-resty-openidc/blob/master/lib/resty/openidc.lua#L1436
-    -- set to deny so resty.openidc returns instead of redirects (ends request)
     ngx.log(ngx.DEBUG, "OidcHandler ajax/async request detected, setting unauth_action = deny")
-    unauth_action = "deny"
+    unauth_action = constants.UNAUTH_ACTION.DENY
+
+  -- If the request is not ajax, and matches the configured authentication path (redirect user if authentication fails)
   elseif ngx.var.request_uri == oidcConfig.force_authentication_path then
     ngx.log(ngx.DEBUG, "OidcHandler force_authentication_path matched request, setting unauth_action = nil")
-    unauth_action = nil
+    unauth_action = constants.UNAUTH_ACTION.NIL
+
+  -- if force_authentication_path is set then allow requests upstream even if unauthenticated
+  -- if force_authentication_path is NOT set then redirect user if not authenticated
+  else
+    unauth_action = oidcConfig.force_authentication_path and constants.UNAUTH_ACTION.PASS or constants.UNAUTH_ACTION.NIL
   end
 
 

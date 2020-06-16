@@ -3,6 +3,7 @@ TestHandler = require("test.unit.mockable_case"):extend()
 local session = nil;
 local idpAuthPath = "/path/to/idp/authentication"
 local publicRoute = "/this/route/is/publicly/accessible"
+local constants = require("kong.plugins.oidc.util.constants")
 
 function TestHandler:setUp()
   TestHandler.super:setUp()
@@ -80,7 +81,7 @@ function TestHandler:test_authenticate_ok_with_userinfo()
   -- assert
   lu.assertTrue(authenticate_called)
   lu.assertEquals(ngx.ctx.authenticated_credential.id, "sub")
-  lu.assertEquals(headers['X-Userinfo'], "eyJzdWIiOiJzdWIifQ==")
+  lu.assertEquals(headers[constants.REQUEST_HEADERS.X_USERINFO], "eyJzdWIiOiJzdWIifQ==")
 end
 
 function TestHandler:test_authenticate_ok_with_no_accesstoken()
@@ -101,7 +102,7 @@ function TestHandler:test_authenticate_ok_with_no_accesstoken()
 
   -- assert
   lu.assertTrue(authenticate_called)
-  lu.assertNil(headers['X-Access-Token'])
+  lu.assertNil(headers[constants.REQUEST_HEADERS.X_ACCESS_TOKEN])
 end
 
 function TestHandler:test_authenticate_ok_with_accesstoken()
@@ -122,7 +123,7 @@ function TestHandler:test_authenticate_ok_with_accesstoken()
 
   -- assert
   lu.assertTrue(authenticate_called)
-  lu.assertEquals(headers['X-Access-Token'], "ACCESS_TOKEN")
+  lu.assertEquals(headers[constants.REQUEST_HEADERS.X_ACCESS_TOKEN], "ACCESS_TOKEN")
 end
 
 function TestHandler:test_authenticate_ok_with_no_idtoken()
@@ -143,7 +144,7 @@ function TestHandler:test_authenticate_ok_with_no_idtoken()
 
   -- assert
   lu.assertTrue(authenticate_called)
-  lu.assertNil(headers['X-ID-Token'])
+  lu.assertNil(headers[constants.REQUEST_HEADERS.X_ID_TOKEN])
 end
 
 function TestHandler:test_authenticate_ok_with_idtoken()
@@ -168,7 +169,7 @@ function TestHandler:test_authenticate_ok_with_idtoken()
 
   -- assert
   lu.assertTrue(authenticate_called)
-  lu.assertEquals(headers['X-ID-Token'], "eyJzdWIiOiJzdWIifQ==")
+  lu.assertEquals(headers[constants.REQUEST_HEADERS.X_ID_TOKEN], "eyJzdWIiOiJzdWIifQ==")
 end
 
 function TestHandler:test_authenticate_error_no_recovery()
@@ -262,8 +263,8 @@ function TestHandler:test_introspect_ok_with_userinfo()
   lu.assertTrue(instrospect_called)
   lu.assertTrue(called_userinfo_endpoint)
   lu.assertEquals(userinfo_to_be_encoded.email, "test@gmail.com")
-  lu.assertEquals(headers['X-Userinfo'], "eyJzdWIiOiJzdWIifQ==")
-  lu.assertEquals(headers['X-Access-Token'], 'xxx')
+  lu.assertEquals(headers[constants.REQUEST_HEADERS.X_USERINFO], "eyJzdWIiOiJzdWIifQ==")
+  lu.assertEquals(headers[constants.REQUEST_HEADERS.X_ACCESS_TOKEN], 'xxx')
 end
 
 function TestHandler:test_bearer_only_with_good_token()
@@ -289,7 +290,7 @@ function TestHandler:test_bearer_only_with_good_token()
 
   -- assert
   lu.assertTrue(introspect_called)
-  lu.assertEquals(headers['X-Userinfo'], "eyJzdWIiOiJzdWIifQ==")
+  lu.assertEquals(headers[constants.REQUEST_HEADERS.X_USERINFO], "eyJzdWIiOiJzdWIifQ==")
 end
 
 function TestHandler:test_bearer_only_with_bad_token()
@@ -355,7 +356,7 @@ function TestHandler:test_authenticate_ok_with_xmlhttprequest()
 
   -- assert
   lu.assertTrue(self:log_contains("ajax/async request detected"))
-  lu.assertEquals(actual_unauth_action, "deny")
+  lu.assertEquals(actual_unauth_action, constants.UNAUTH_ACTION.DENY)
 end
 
 function TestHandler:test_authenticate_nok_with_xmlhttprequest()
@@ -437,7 +438,7 @@ function TestHandler:test_authenticate_ok_to_non_force_authentication_path()
   self.handler:access({ force_authentication_path = idpAuthPath })
 
   -- assert
-  lu.assertEquals(actual_unauth_action, "pass")
+  lu.assertEquals(actual_unauth_action, constants.UNAUTH_ACTION.PASS)
 end
 
 function TestHandler:test_authenticate_nok_to_force_authentication_path_with_xmlhttprequest()
@@ -463,7 +464,7 @@ function TestHandler:test_authenticate_nok_to_force_authentication_path_with_xml
 
   -- assert
   lu.assertTrue(self:log_contains("ajax/async request detected"))
-  lu.assertEquals(actual_unauth_action, "deny")
+  lu.assertEquals(actual_unauth_action, constants.UNAUTH_ACTION.DENY)
   lu.assertEquals(ngx.status, ngx.HTTP_UNAUTHORIZED)
 end
 

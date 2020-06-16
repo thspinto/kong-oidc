@@ -1,4 +1,5 @@
 local cjson = require("cjson")
+local constants = require("kong.plugins.oidc.util.constants")
 
 local M = {}
 
@@ -53,12 +54,12 @@ function M.exit(httpStatusCode, message, ngxCode)
 end
 
 function M.injectAccessToken(accessToken)
-  ngx.req.set_header("X-Access-Token", accessToken)
+  ngx.req.set_header(constants.REQUEST_HEADERS.X_ACCESS_TOKEN, accessToken)
 end
 
 function M.injectIDToken(idToken)
   local tokenStr = cjson.encode(idToken)
-  ngx.req.set_header("X-ID-Token", ngx.encode_base64(tokenStr))
+  ngx.req.set_header(constants.REQUEST_HEADERS.X_ID_TOKEN, ngx.encode_base64(tokenStr))
 end
 
 function M.injectUser(user)
@@ -67,7 +68,7 @@ function M.injectUser(user)
   tmp_user.username = user.preferred_username
   ngx.ctx.authenticated_credential = tmp_user
   local userinfo = cjson.encode(user)
-  ngx.req.set_header("X-Userinfo", ngx.encode_base64(userinfo))
+  ngx.req.set_header(constants.REQUEST_HEADERS.X_USERINFO, ngx.encode_base64(userinfo))
 end
 
 function M.has_bearer_access_token()
@@ -134,9 +135,9 @@ function M.cache_get(type, key)
 end
 
 function M.clear_request_headers()
-  ngx.req.clear_header("X-Access-Token")
-  ngx.req.clear_header("X-ID-Token")
-  ngx.req.clear_header("X-Userinfo")
+  ngx.req.clear_header(constants.REQUEST_HEADERS.X_ACCESS_TOKEN)
+  ngx.req.clear_header(constants.REQUEST_HEADERS.X_ID_TOKEN)
+  ngx.req.clear_header(constants.REQUEST_HEADERS.X_USERINFO)
 end
 
 return M
