@@ -5,8 +5,6 @@ local MockableCase = BaseCase:extend()
 function MockableCase:setUp()
   MockableCase.super:setUp()
   self.logs = {}
-  self.kong = _G.kong
-  _G.kong = self.mocked_kong
 
   self.mocked_ngx = {
     DEBUG = "debug",
