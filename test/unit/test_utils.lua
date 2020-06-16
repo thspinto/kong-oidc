@@ -25,6 +25,7 @@ function TestUtils:setUp()
     redirect_after_logout_uri = "/login",
     prompt = "login",
     session = { cookie = { samesite = "None" } },
+    force_authentication_path = "/api/auth/login"
   }
 
   _G.ngx = {
@@ -59,6 +60,7 @@ function TestUtils:testOptions()
   lu.assertEquals(opts.redirect_after_logout_uri, "/login")
   lu.assertEquals(opts.prompt, "login")
   lu.assertEquals(session.cookie.samesite, "None")
+  lu.assertEquals(opts.force_authentication_path, "/api/auth/login")
 
 end
 

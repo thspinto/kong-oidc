@@ -96,7 +96,7 @@ function make_oidc(oidcConfig, oidcSessionConfig)
   end
 
   local ngx_headers = ngx.req.get_headers()
-  local unauth_action = oidcConfig.idp_authentication_path and "pass" or nil
+  local unauth_action = oidcConfig.force_authentication_path and "pass" or nil
 
   -- @TODO: move the hard coded path to config file
   if ngx_headers and ngx_headers["X-Requested-With"] == "XMLHttpRequest" then
@@ -104,7 +104,7 @@ function make_oidc(oidcConfig, oidcSessionConfig)
     -- set to deny so resty.openidc returns instead of redirects (ends request)
     ngx.log(ngx.DEBUG, "OidcHandler ajax/async request detected, setting unauth_action = deny")
     unauth_action = "deny"
-  elseif ngx.var.request_uri == oidcConfig.idp_authentication_path then
+  elseif ngx.var.request_uri == oidcConfig.force_authentication_path then
     ngx.log(ngx.DEBUG, "OidcHandler login request detected, setting unauth_action = nil")
     unauth_action = nil
   end

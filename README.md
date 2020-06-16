@@ -31,18 +31,18 @@ The diagram below shows the message exchange between the involved parties.
 
 ![alt Kong OIDC flow](docs/kong_oidc_flow.png)
 
-The `X-Userinfo` header contains the payload from the Userinfo Endpoint
-
-```
-X-Userinfo: {"preferred_username":"alice","id":"60f65308-3510-40ca-83f0-e9c0151cc680","sub":"60f65308-3510-40ca-83f0-e9c0151cc680"}
-```
-
-The following headers are stripped at the beginning of this plugins execution:
+For security purposes the following headers are stripped at the beginning of this plugins execution:
 * `X-Access-Token`
 * `X-ID-Token`
 * `X-Userinfo`
 
 These headers will only be appended to the requests if the user is authenticated or has a valid session.
+
+The `X-Userinfo` header contains the payload from the Userinfo Endpoint
+
+```
+X-Userinfo: {"preferred_username":"alice","id":"60f65308-3510-40ca-83f0-e9c0151cc680","sub":"60f65308-3510-40ca-83f0-e9c0151cc680"}
+```
 
 The plugin also sets the `ngx.ctx.authenticated_consumer` variable, which can be using in other Kong plugins:
 ```
@@ -52,9 +52,9 @@ ngx.ctx.authenticated_consumer = {
 }
 ```
 
-### Async/Ajax Requests
+### XMLHttp/Ajax Requests
 
-HTTP Requests made by the browser should include the `X-Requested-With: XMLHttpRequest` header. 302 Redirects are replaced with 401 Unauhtorized HTTP responses when this header is present.
+HTTP Requests made by client-side code (e.g ajax) should include the `X-Requested-With: XMLHttpRequest` header. 302 Redirects are replaced with 401 Unauthorized HTTP responses when this header is present AND the user is unauthenticated.
 
 ## Dependencies
 
@@ -111,7 +111,7 @@ For full support and functionality you should have a `lua_shared_dict` with the 
 | `config.redirect_uri`                       |                                          | true     | URI (absolute, e.g. http://website.com) to which authorization code is sent back from OIDC Provider                                                                                                                                                                                 |
 | `config.prompt`                             |                                          | false    | Valid values include `none`, `login`, `consent` and/or `select_account`. Note if using `refresh_token` grant then `consent` is required. See [https://openid.net/specs/openid-connect-core-1_0.html#AuthRequest](https://openid.net/specs/openid-connect-core-1_0.html#AuthRequest) |
 | `config.session`                            | `{ cookie = { samesite = 'Lax' }}`       | false    | See [OIDC Session Config](#oidc-session-config)                                                                                                                                                                                                                                     |
-| `config.idp_authentication_url`             |                                          | false    | See [pass oidc setting](#idp_authentication_url-oidc-setting)                                                                                                                                                                                                                       |
+| `config.force_authentication_path`          |                                          | false    | See [force_authentication_path Parameter](#force_authentication_path-parameter)                                                                                                                                                                                                                       |
 
 #### Discovery Override
 
@@ -164,13 +164,15 @@ These properties are provided to `session.start(opts)`, for more information on 
 - nonce - Replay attack mitigation
 - last_authenticated - used for silent reauthentication
 
-#### idp_authentication_url OIDC Setting
+#### force_authentication_path Parameter
 
-By default, the kong oidc plugin prevents unauthenticated requests from reaching the upstream api. When the `idp_authentication_url` parameter is set, the behavior is changed.
+By default, the **kong oidc** plugin prevents unauthenticated requests from reaching the upstream api. When the `force_authentication_path` parameter is set, the behavior is changed.
 
-Setting the `idp_authentication_path` parameter changes the plugin behavior to allow unauthenticated request to reach the upstream API. Unauthenticated requests will be proxied with out `x-userinfo` headers. Authenticated requests will be proxied with `x-userinfo`.
+Setting the `force_authentication_path` parameter changes the plugin behavior to allow unauthenticated request to reach the upstream API. Unauthenticated requests will be proxied without `x-userinfo` headers. Authenticated requests will be proxied with `x-userinfo`.
 
-The `idp_authentication_path` variable should be a *string* url path value (e.g `/api/auth/login`). When a request is made to the defined path if the user is authenticated then the plugin will respond with a 302 HTTP status code to redirect the user to the IDP login page (authentication code flow).
+The `force_authentication_path` variable should be a *string* relative url path value (e.g `/api/auth/login`). When a request is made to the defined path if the user is unauthenticated then the plugin will respond with a 302 HTTP status code to redirect the user to the IDP login page (authentication code flow).
+
+The following diagram illustrates how the behavior of **kong-oidc** plugin when the parameter `force_authentication_path` is set.
 
 ![alt Kong OIDC pass flow](docs/kong_oidc_pass_flow.png)
 

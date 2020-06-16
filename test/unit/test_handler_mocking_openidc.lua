@@ -351,7 +351,7 @@ function TestHandler:test_authenticate_ok_with_xmlhttprequest()
   end
 
   -- act
-  self.handler:access({ idp_authentication_path = idpAuthPath})
+  self.handler:access({ force_authentication_path = idpAuthPath})
 
   -- assert
   lu.assertTrue(self:log_contains("ajax/async request detected"))
@@ -406,7 +406,7 @@ function TestHandler:test_authenticate_with_session_cookie_samesite_set_to_none(
   lu.assertItemsEquals(v, opts.session)
 end
 
-function TestHandler:test_authenticate_ok_to_idp_authentication_path()
+function TestHandler:test_authenticate_ok_to_force_authentication_path()
   -- arrange
   local actual_unauth_action
   ngx.var.request_uri = idpAuthPath
@@ -417,14 +417,14 @@ function TestHandler:test_authenticate_ok_to_idp_authentication_path()
     return {}, false, "/", session
   end
   -- act
-  self.handler:access({ idp_authentication_path = idpAuthPath })
+  self.handler:access({ force_authentication_path = idpAuthPath })
 
   -- assert
   lu.assertTrue(self:log_contains("login request detected"))
   lu.assertEquals(actual_unauth_action, nil)
 end
 
-function TestHandler:test_authenticate_ok_to_non_idp_authentication_path()
+function TestHandler:test_authenticate_ok_to_non_force_authentication_path()
   -- arrange
   local actual_unauth_action
 
@@ -434,13 +434,13 @@ function TestHandler:test_authenticate_ok_to_non_idp_authentication_path()
     return {}, false, "/", session
   end
   -- act
-  self.handler:access({ idp_authentication_path = idpAuthPath })
+  self.handler:access({ force_authentication_path = idpAuthPath })
 
   -- assert
   lu.assertEquals(actual_unauth_action, "pass")
 end
 
-function TestHandler:test_authenticate_ok_to_idp_authentication_path()
+function TestHandler:test_authenticate_ok_to_force_authentication_path()
   -- arrange
   local actual_unauth_action
   ngx.var.request_uri = idpAuthPath
@@ -459,7 +459,7 @@ function TestHandler:test_authenticate_ok_to_idp_authentication_path()
   end
 
   -- act
-  self.handler:access({ idp_authentication_path = idpAuthPath})
+  self.handler:access({ force_authentication_path = idpAuthPath})
 
   -- assert
   lu.assertTrue(self:log_contains("ajax/async request detected"))

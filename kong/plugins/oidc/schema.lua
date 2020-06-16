@@ -62,7 +62,7 @@ return {
               }
             }
           },
-          { idp_authentication_path = { type = "string" } }
+          { force_authentication_path = { type = "string" } }
         }
       }
     }
