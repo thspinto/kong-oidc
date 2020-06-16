@@ -2,7 +2,6 @@ local utils = require("kong.plugins.oidc.utils")
 local lu = require("luaunit")
 -- opts_fixture, ngx are global to prevent mutation in consecutive tests
 local opts_fixture = nil
-local ngx = nil
 
 TestUtils = require("test.unit.base_case"):extend()
 
@@ -28,7 +27,7 @@ function TestUtils:setUp()
     session = { cookie = { samesite = "None" } },
   }
 
-  ngx = {
+  _G.ngx = {
     var = { request_uri = "/path"},
     req = { get_uri_args = function() return nil end }
   }
@@ -78,6 +77,7 @@ function TestUtils:testDiscoveryOverride()
 end
 
 function TestUtils:testClearRequestHeaders()
+  -- assign
   local headers = {}
 
   _G.ngx = {
@@ -88,8 +88,10 @@ function TestUtils:testClearRequestHeaders()
     }
   }
 
+  -- act
   utils.clear_request_headers()
 
+  -- assert
   lu.assertTrue(headers["X-Access-Token"])
   lu.assertTrue(headers["X-ID-Token"])
   lu.assertTrue(headers["X-Userinfo"])
