@@ -420,7 +420,7 @@ function TestHandler:test_authenticate_ok_to_force_authentication_path()
   self.handler:access({ force_authentication_path = idpAuthPath })
 
   -- assert
-  lu.assertTrue(self:log_contains("login request detected"))
+  lu.assertTrue(self:log_contains("force_authentication_path matched request"))
   lu.assertEquals(actual_unauth_action, nil)
 end
 
@@ -440,7 +440,7 @@ function TestHandler:test_authenticate_ok_to_non_force_authentication_path()
   lu.assertEquals(actual_unauth_action, "pass")
 end
 
-function TestHandler:test_authenticate_ok_to_force_authentication_path()
+function TestHandler:test_authenticate_nok_to_force_authentication_path_with_xmlhttprequest()
   -- arrange
   local actual_unauth_action
   ngx.var.request_uri = idpAuthPath

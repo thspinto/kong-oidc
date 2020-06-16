@@ -54,7 +54,11 @@ ngx.ctx.authenticated_consumer = {
 
 ### XMLHttp/Ajax Requests
 
-HTTP Requests made by client-side code (e.g ajax) should include the `X-Requested-With: XMLHttpRequest` header. 302 Redirects are replaced with 401 Unauthorized HTTP responses when this header is present AND the user is unauthenticated.
+XMLHttpRequests made by client-side code (i.e ajax) should include the `X-Requested-With: XMLHttpRequest` header. 302 Redirects are replaced with 401 Unauthorized HTTP responses when this header is present AND the user is unauthenticated.
+
+#### Why?
+
+302 redirects are followed transparently via XMLHttpRequests (xhr/ajax requests) thus there is nothing the client side can do to detect if a 302 happened. Returning a status code of 401 allows the client to respond to the request accordingly.
 
 ## Dependencies
 
@@ -229,7 +233,7 @@ Server: kong/0.11.0
 
 ### Upstream API request
 
-The plugin adds an additional `X-Userinfo`, `X-Access-Token` and `X-Id-Token` headers to the upstream request, which can be consumer by upstream server. Note if these headers were present in the request prior to the execution fo this plugin, then they will be removed/overwritten. All of them are base64 encoded:
+The plugin adds an additional `X-Userinfo`, `X-Access-Token` and `X-Id-Token` headers to the upstream request, which can be consumer by upstream server. Note if these headers were present in the request prior to the execution of this plugin, then they will be removed/overwritten. All of them are base64 encoded:
 
 ```
 GET / HTTP/1.1
