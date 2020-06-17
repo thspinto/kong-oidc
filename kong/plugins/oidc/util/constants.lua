@@ -15,7 +15,7 @@ local constants = {
     PASS = "pass",
     DENY = "deny",
     NIL = nil,
-  }
+  },
 }
 
 

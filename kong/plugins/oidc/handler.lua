@@ -110,7 +110,7 @@ function make_oidc(oidcConfig, oidcSessionConfig)
     unauth_action = constants.UNAUTH_ACTION.DENY
 
   -- If the request is not ajax, and matches the configured authentication path (redirect user if authentication fails)
-  elseif ngx.var.request_uri == oidcConfig.force_authentication_path then
+  elseif ngx.var.uri == oidcConfig.force_authentication_path then
     ngx.log(ngx.DEBUG, "OidcHandler force_authentication_path matched request, setting unauth_action = nil")
     unauth_action = constants.UNAUTH_ACTION.NIL
   end

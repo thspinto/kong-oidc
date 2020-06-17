@@ -13,7 +13,10 @@ function MockableCase:setUp()
     HTTP_UNAUTHORIZED = 401,
     ctx = {},
     header = {},
-    var = {request_uri = "/"},
+    var = {
+      request_uri = "/",
+      uri = "/"
+    },
     req = {
       get_uri_args = function(...) end,
       set_header = function(...) end,

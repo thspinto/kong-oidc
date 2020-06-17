@@ -1,9 +1,8 @@
 local lu = require("luaunit")
 TestHandler = require("test.unit.mockable_case"):extend()
 local session = nil;
-local idpAuthPath = "/path/to/idp/authentication"
-local publicRoute = "/this/route/is/publicly/accessible"
 local constants = require("kong.plugins.oidc.util.constants")
+local forceAuthPath = "/path/to/idp/authentication"
 
 function TestHandler:setUp()
   TestHandler.super:setUp()
@@ -361,7 +360,7 @@ function TestHandler:test_authenticate_ok_with_xmlhttprequest()
   end
 
   -- act
-  self.handler:access({ force_authentication_path = idpAuthPath})
+  self.handler:access({ force_authentication_path = forceAuthPath })
 
   -- assert
   lu.assertTrue(self:log_contains("ajax/async request detected"))
@@ -436,7 +435,8 @@ end
 function TestHandler:test_authenticate_ok_to_force_authentication_path()
   -- arrange
   local actual_unauth_action
-  ngx.var.request_uri = idpAuthPath
+  -- @TODO: Address request_uri and uri inconsistency
+  ngx.var.uri = forceAuthPath
 
   -- mock authenticate to be able to check unauth_action
   self.module_resty.openidc.authenticate = function(opts, target_url, unauth_action)
@@ -444,7 +444,7 @@ function TestHandler:test_authenticate_ok_to_force_authentication_path()
     return {}, false, "/", session
   end
   -- act
-  self.handler:access({ force_authentication_path = idpAuthPath })
+  self.handler:access({ force_authentication_path = forceAuthPath })
 
   -- assert
   lu.assertTrue(self:log_contains("force_authentication_path matched request"))
@@ -461,7 +461,7 @@ function TestHandler:test_authenticate_ok_to_non_force_authentication_path()
     return {}, false, "/", session
   end
   -- act
-  self.handler:access({ force_authentication_path = idpAuthPath })
+  self.handler:access({ force_authentication_path = forceAuthPath })
 
   -- assert
   lu.assertEquals(actual_unauth_action, constants.UNAUTH_ACTION.PASS)
@@ -470,7 +470,6 @@ end
 function TestHandler:test_authenticate_nok_to_force_authentication_path_with_xmlhttprequest()
   -- arrange
   local actual_unauth_action
-  ngx.var.request_uri = idpAuthPath
 
   -- add XMLHttpRequest to headers
   ngx.req.get_headers = function()
@@ -486,7 +485,7 @@ function TestHandler:test_authenticate_nok_to_force_authentication_path_with_xml
   end
 
   -- act
-  self.handler:access({ force_authentication_path = idpAuthPath})
+  self.handler:access({ force_authentication_path = forceAuthPath })
 
   -- assert
   lu.assertTrue(self:log_contains("ajax/async request detected"))
