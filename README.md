@@ -60,6 +60,25 @@ XMLHttpRequests made by client-side code (i.e ajax) should include the `X-Reques
 
 302 redirects are followed transparently via XMLHttpRequests (xhr/ajax requests) thus there is nothing the client side can do to detect if a 302 happened. Returning a status code of 401 allows the client to respond to the request accordingly.
 
+The response body of this 401 is as follows:
+
+```
+{
+  "status":401,
+  "request_path":"/api/path"
+}
+```
+
+Currently we do NOT have access to the redirect url that **lua-resty-openidc** would normally generate thus we only respond with the above body. When **lua-resty-openidc** exposes the method generating the authorization code path uri then we change the http response body the following:
+
+```
+{
+  "status":302,
+  "request_path":"/api/path",
+  "redirect_path":"https://idp.com/oauth/authorize?client_id=a17c21ed&response_type=code..."
+}
+```
+
 ## Dependencies
 
 **kong-oidc** depends on the following package:
