@@ -5,9 +5,9 @@ local filter = require("kong.plugins.oidc.filter")
 local session = require("kong.plugins.oidc.session")
 local cjson = require("cjson")
 local openidc = require("resty.openidc")
+local constants = require("kong.plugins.oidc.util.constants")
 
 OidcHandler.PRIORITY = 1000
-
 
 function OidcHandler:new()
   OidcHandler.super.new(self, "oidc")
@@ -31,6 +31,9 @@ end
 function handle(oidcConfig, oidcSessionConfig)
   local response
 
+  -- clear oidc plugin headers to prevent spoofing of info to upstream api
+  utils.clear_request_headers()
+
   -- get/cache discovery data, mutate oidcConfig.discovery if it is a string (discovery endpoint)
   openidc.get_discovery_doc(oidcConfig)
 
@@ -41,7 +44,7 @@ function handle(oidcConfig, oidcSessionConfig)
     if response then
       local access_token = utils.get_bearer_access_token_from_header(oidcConfig)
       local userinfo, err = get_userinfo(oidcConfig, response)
-      
+
       -- @todo: how can we distinguish between access_token and id_token?
       -- err can occur due to id_token being used for authorization header instead of access_token
       if err or not userinfo then
@@ -49,7 +52,7 @@ function handle(oidcConfig, oidcSessionConfig)
         -- introspect passed but userinfo failed, set userinfo to decoded token instead of leaving blank
         userinfo = response
       end
-      
+
       response = {
         access_token = access_token,
         user = userinfo
@@ -93,21 +96,28 @@ function make_oidc(oidcConfig, oidcSessionConfig)
     end
   end
 
-  -- grab X-Requested-With Header to see if request was from browser/ajax
-  local unauth_action = nil
   local ngx_headers = ngx.req.get_headers()
-  if ngx_headers then
-    local xhr_value = ngx_headers["X-Requested-With"]
-    -- was the request ajax/async?
-    if xhr_value == "XMLHttpRequest" then
-      -- reference: https://github.com/zmartzone/lua-resty-openidc/blob/master/lib/resty/openidc.lua#L1436
-      -- set to deny so resty.openidc returns instead of redirects (ends request)
-      ngx.log(ngx.DEBUG, "OidcHandler ajax/async request detected, setting unauth_action = deny")
-      unauth_action = "deny"
-    end
+
+  -- default value for unauth_action is based on force_authentication_path being set.
+  -- If set, unauth_action is set to "pass", default action is to allow request through to the upstream service.
+  -- If not set, unauth_action is set to nil, default action is to redirect request to idp authentication.
+  local unauth_action = oidcConfig.force_authentication_path and constants.UNAUTH_ACTION.PASS or constants.UNAUTH_ACTION.NIL
+
+  -- If the request is an ajax request, set unauth_action to deny (don't redirect user if authentication fails)
+  if ngx_headers and ngx_headers["X-Requested-With"] == "XMLHttpRequest" then
+    -- reference: https://github.com/zmartzone/lua-resty-openidc/blob/master/lib/resty/openidc.lua#L1436
+    ngx.log(ngx.DEBUG, "OidcHandler ajax/async request detected, setting unauth_action = deny")
+    unauth_action = constants.UNAUTH_ACTION.DENY
+
+  -- If the request is not ajax, and matches the configured authentication path (redirect user if authentication fails)
+  elseif ngx.var.request_uri == oidcConfig.force_authentication_path then
+    ngx.log(ngx.DEBUG, "OidcHandler force_authentication_path matched request, setting unauth_action = nil")
+    unauth_action = constants.UNAUTH_ACTION.NIL
   end
 
+
   local res, err, original_url, session = openidc.authenticate(oidcConfig, nil, unauth_action, oidcSessionConfig)
+
 
   -- @todo: add unit test to check for session:close()
   -- handle and close session, prevent locking
@@ -117,7 +127,7 @@ function make_oidc(oidcConfig, oidcSessionConfig)
   -- code execution has gone this far, so return 401 status code to allow client to respond accordingly
   if err == "unauthorized request" then
     ngx.log(ngx.DEBUG, "OidcHandler unauthorized ajax/async request detected, responding with 401 status code")
-    local message = cjson.encode({ status = ngx.status, request_path = ngx.var.request_uri})
+    local message = cjson.encode({ status = ngx.HTTP_UNAUTHORIZED, request_path = ngx.var.request_uri})
     return utils.exit(ngx.HTTP_UNAUTHORIZED, message, ngx.HTTP_UNAUTHORIZED)
   end
 
@@ -159,7 +169,7 @@ function get_userinfo(oidcConfig, introspect_response)
   -- cache hit
   if userinfo then
     userinfo = cjson.decode(userinfo)
-    
+
     -- check if decoded value is blank
     if userinfo == cjson.null then
       ngx.log(ngx.DEBUG, "userinfo cached value is null returning nil value")
@@ -168,22 +178,22 @@ function get_userinfo(oidcConfig, introspect_response)
 
     return userinfo
   end
-  
+
   ngx.log(ngx.INFO, "userinfo cache miss, calling userinfo endpoint")
   userinfo, err = openidc.call_userinfo_endpoint(oidcConfig, access_token)
-  
+
   if err then
     ngx.log(ngx.ERR, "call to userinfo endpoint failed, ", err)
     return nil, err
   end
 
   -- @see openidc.introspect https://github.com/zmartzone/lua-resty-openidc/blob/master/lib/resty/openidc.lua#L1575
-  -- utilized openidc.introspect caching logic 
+  -- utilized openidc.introspect caching logic
   -- todo: add tests to verify values are respected
   local introspection_cache_ignore = oidcConfig.introspection_cache_ignore or false
   local expiry_claim = oidcConfig.introspection_expiry_claim or "exp"
   local introspection_interval = oidcConfig.introspection_interval or 0
-  
+
   if not introspection_cache_ignore and introspect_response[expiry_claim] then
     local ttl = introspect_response[expiry_claim]
     ngx.log(ngx.INFO, ttl)

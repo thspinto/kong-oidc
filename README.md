@@ -31,6 +31,13 @@ The diagram below shows the message exchange between the involved parties.
 
 ![alt Kong OIDC flow](docs/kong_oidc_flow.png)
 
+For security purposes the following headers are stripped at the beginning of this plugins execution:
+* `X-Access-Token`
+* `X-ID-Token`
+* `X-Userinfo`
+
+These headers will only be appended to the requests if the user is authenticated or has a valid session.
+
 The `X-Userinfo` header contains the payload from the Userinfo Endpoint
 
 ```
@@ -45,6 +52,32 @@ ngx.ctx.authenticated_consumer = {
 }
 ```
 
+### XMLHttp/Ajax Requests
+
+XMLHttpRequests made by client-side code (i.e ajax) should include the `X-Requested-With: XMLHttpRequest` header. 302 Redirects are replaced with 401 Unauthorized HTTP responses when this header is present AND the user is unauthenticated.
+
+#### Why?
+
+302 redirects are followed transparently via XMLHttpRequests (xhr/ajax requests) thus there is nothing the client side can do to detect if a 302 happened. Returning a status code of 401 allows the client to respond to the request accordingly.
+
+The response body of this 401 is as follows:
+
+```
+{
+  "status":401,
+  "request_path":"/api/path"
+}
+```
+
+Currently we do NOT have access to the redirect url that **lua-resty-openidc** would normally generate thus we only respond with the above body. When **lua-resty-openidc** exposes the method generating the authorization code path uri then we change the http response body the following:
+
+```
+{
+  "status":302,
+  "request_path":"/api/path",
+  "redirect_path":"https://idp.com/oauth/authorize?client_id=a17c21ed&response_type=code..."
+}
+```
 
 ## Dependencies
 
@@ -80,20 +113,20 @@ For full support and functionality you should have a `lua_shared_dict` with the 
 
 ### Parameters
 
-| Parameter                                   | Default                                  | Required | description                                                                                                                                          |
-| ------------------------------------------- | ---------------------------------------- | -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `name`                                      |                                          | true     | plugin name, has to be `oidc`                                                                                                                        |
-| `config.client_id`                          |                                          | true     | OIDC Client ID                                                                                                                                       |
-| `config.client_secret`                      |                                          | true     | OIDC Client secret                                                                                                                                   |
-| `config.discovery`                          | https://.well-known/openid-configuration | true     | OIDC Discovery Endpoint (`/.well-known/openid-configuration`)                                                                                        |
-| `config.discovery_override`                 |                                          | false    | This is a **map** type with multiple properties. See [Discovery Override](#discovery-override) below.                                                |
-| `config.scope`                              | openid                                   | false    | OAuth2 Token scope. To use OIDC it has to contains the `openid` scope. Note if using `refresh_token` grant then include `offline_access` as a scope. |
-| `config.ssl_verify`                         | false                                    | false    | Enable SSL verification to OIDC Provider                                                                                                             |
-| `config.session_secret`                     |                                          | false    | Additional parameter, which is used to encrypt the session cookie. Needs to be random                                                                |
-| `config.introspection_endpoint_auth_method` | client_secret_basic                      | false    | Token introspection auth method. resty-openidc supports `client_secret_(basic|post)`                                                                 |
-| `config.introspection_expiry_claim`         |                                          | false    | Claim name that will be checked to determine cache ttl                                                                                               |
-| `config.introspection_cache_ignore`         | false                                    | false    | Forces cache to NOT be used                                                                                                                          |
-| `config.introspection_interval`             |                                          | false    | TTL that can be used to overwrite token `expiry_claim` ttl (will only be used if shorter then `expiry_claim`)                                        |
+| Parameter                                   | Default                                  | Required | description                                                                                                                                                                                                                                                                         |
+| ------------------------------------------- | ---------------------------------------- | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `name`                                      |                                          | true     | plugin name, has to be `oidc`                                                                                                                                                                                                                                                       |
+| `config.client_id`                          |                                          | true     | OIDC Client ID                                                                                                                                                                                                                                                                      |
+| `config.client_secret`                      |                                          | true     | OIDC Client secret                                                                                                                                                                                                                                                                  |
+| `config.discovery`                          | https://.well-known/openid-configuration | true     | OIDC Discovery Endpoint (`/.well-known/openid-configuration`)                                                                                                                                                                                                                       |
+| `config.discovery_override`                 |                                          | false    | This is a **map** type with multiple properties. See [Discovery Override](#discovery-override) below.                                                                                                                                                                               |
+| `config.scope`                              | openid                                   | false    | OAuth2 Token scope. To use OIDC it has to contains the `openid` scope. Note if using `refresh_token` grant then include `offline_access` as a scope.                                                                                                                                |
+| `config.ssl_verify`                         | false                                    | false    | Enable SSL verification to OIDC Provider                                                                                                                                                                                                                                            |
+| `config.session_secret`                     |                                          | false    | Additional parameter, which is used to encrypt the session cookie. Needs to be random                                                                                                                                                                                               |
+| `config.introspection_endpoint_auth_method` | client_secret_basic                      | false    | Token introspection auth method. resty-openidc supports `client_secret_(basic|post)`                                                                                                                                                                                                |
+| `config.introspection_expiry_claim`         |                                          | false    | Claim name that will be checked to determine cache ttl                                                                                                                                                                                                                              |
+| `config.introspection_cache_ignore`         | false                                    | false    | Forces cache to NOT be used                                                                                                                                                                                                                                                         |
+| `config.introspection_interval`             |                                          | false    | TTL that can be used to overwrite token `expiry_claim` ttl (will only be used if shorter then `expiry_claim`)                                                                                                                                                                       |
 | `config.timeout`                            |                                          | false    | OIDC endpoint calls timeout                                                                                                                                                                                                                                                         |
 | `config.bearer_only`                        | no                                       | false    | Only introspect tokens without redirecting                                                                                                                                                                                                                                          |
 | `config.realm`                              | kong                                     | false    | Realm used in WWW-Authenticate response header                                                                                                                                                                                                                                      |
@@ -101,6 +134,7 @@ For full support and functionality you should have a `lua_shared_dict` with the 
 | `config.redirect_uri`                       |                                          | true     | URI (absolute, e.g. http://website.com) to which authorization code is sent back from OIDC Provider                                                                                                                                                                                 |
 | `config.prompt`                             |                                          | false    | Valid values include `none`, `login`, `consent` and/or `select_account`. Note if using `refresh_token` grant then `consent` is required. See [https://openid.net/specs/openid-connect-core-1_0.html#AuthRequest](https://openid.net/specs/openid-connect-core-1_0.html#AuthRequest) |
 | `config.session`                            | `{ cookie = { samesite = 'Lax' }}`       | false    | See [OIDC Session Config](#oidc-session-config)                                                                                                                                                                                                                                     |
+| `config.force_authentication_path`          |                                          | false    | See [force_authentication_path Parameter](#force_authentication_path-parameter)                                                                                                                                                                                                                       |
 
 #### Discovery Override
 
@@ -152,6 +186,18 @@ These properties are provided to `session.start(opts)`, for more information on 
 - state - CSRF/XSRF mitigation
 - nonce - Replay attack mitigation
 - last_authenticated - used for silent reauthentication
+
+#### force_authentication_path Parameter
+
+By default, the **kong oidc** plugin prevents unauthenticated requests from reaching the upstream api. When the `force_authentication_path` parameter is set, the behavior is changed.
+
+Setting the `force_authentication_path` parameter changes the plugin behavior to allow unauthenticated request to reach the upstream API. Unauthenticated requests will be proxied without `x-userinfo` headers. Authenticated requests will be proxied with `x-userinfo`.
+
+The `force_authentication_path` variable should be a *string* relative url path value (e.g `/api/auth/login`). When a request is made to the defined path if the user is unauthenticated then the plugin will respond with a 302 HTTP status code to redirect the user to the IDP login page (authentication code flow).
+
+The following diagram illustrates how the behavior of **kong-oidc** plugin when the parameter `force_authentication_path` is set.
+
+![alt Kong OIDC force authentication path](docs/kong_oidc_force_auth_path.png)
 
 ### Enabling
 
@@ -206,7 +252,7 @@ Server: kong/0.11.0
 
 ### Upstream API request
 
-The plugin adds an additional `X-Userinfo`, `X-Access-Token` and `X-Id-Token` headers to the upstream request, which can be consumer by upstream server. All of them are base64 encoded:
+The plugin adds an additional `X-Userinfo`, `X-Access-Token` and `X-Id-Token` headers to the upstream request, which can be consumer by upstream server. Note if these headers were present in the request prior to the execution of this plugin, then they will be removed/overwritten. All of them are base64 encoded:
 
 ```
 GET / HTTP/1.1
@@ -231,6 +277,10 @@ X-Id-Token: eyJuYmYiOjAsImF6cCI6ImtvbmciLCJpYXQiOjE1NDg1MTA3NjksImlzcyI6Imh0dHA6
 
 
 ## Development
+
+The following references are useful to those that are new to kong plugin development:
+* [https://docs.konghq.com/1.5.x/plugin-development/file-structure/](https://docs.konghq.com/1.5.x/plugin-development/file-structure/)
+* [https://docs.konghq.com/1.5.x/plugin-development/custom-logic/](https://docs.konghq.com/1.5.x/plugin-development/custom-logic/)
 
 ### Running Unit Tests
 

@@ -61,7 +61,8 @@ return {
                 { end_session_endpoint = { type = "string", required = false  } }
               }
             }
-          }
+          },
+          { force_authentication_path = { type = "string" } }
         }
       }
     }

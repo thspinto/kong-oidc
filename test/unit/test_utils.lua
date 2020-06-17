@@ -1,37 +1,38 @@
 local utils = require("kong.plugins.oidc.utils")
 local lu = require("luaunit")
+local constants = require("kong.plugins.oidc.util.constants")
 -- opts_fixture, ngx are global to prevent mutation in consecutive tests
 local opts_fixture = nil
-local ngx = nil
 
 TestUtils = require("test.unit.base_case"):extend()
 
 function TestUtils:setUp()
   -- reset opts_fixture
   opts_fixture = {
-      client_id = 1,
-      client_secret = 2,
-      discovery = "d",
-      scope = "openid",
-      response_type = "code",
-      ssl_verify = "no",
-      token_endpoint_auth_method = "client_secret_post",
-      introspection_endpoint_auth_method = "client_secret_basic",
-      introspection_expiry_claim = "expires",
-      introspection_cache_ignore = false,
-      introspection_interval = 600,
-      filters = "pattern1,pattern2,pattern3",
-      logout_path = "/logout",
-      redirect_uri = "http://domain.com/auth/callback",
-      redirect_after_logout_uri = "/login",
-      prompt = "login",
-      session = { cookie = { samesite = "None" } },
-    }
+    client_id = 1,
+    client_secret = 2,
+    discovery = "d",
+    scope = "openid",
+    response_type = "code",
+    ssl_verify = "no",
+    token_endpoint_auth_method = "client_secret_post",
+    introspection_endpoint_auth_method = "client_secret_basic",
+    introspection_expiry_claim = "expires",
+    introspection_cache_ignore = false,
+    introspection_interval = 600,
+    filters = "pattern1,pattern2,pattern3",
+    logout_path = "/logout",
+    redirect_uri = "http://domain.com/auth/callback",
+    redirect_after_logout_uri = "/login",
+    prompt = "login",
+    session = { cookie = { samesite = "None" } },
+    force_authentication_path = "/api/auth/login"
+  }
 
-    ngx = {
-      var = { request_uri = "/path"},
-      req = { get_uri_args = function() return nil end }
-    }
+  _G.ngx = {
+    var = { request_uri = "/path"},
+    req = { get_uri_args = function() return nil end }
+  }
 end
 
 function TestUtils:testOptions()
@@ -60,6 +61,7 @@ function TestUtils:testOptions()
   lu.assertEquals(opts.redirect_after_logout_uri, "/login")
   lu.assertEquals(opts.prompt, "login")
   lu.assertEquals(session.cookie.samesite, "None")
+  lu.assertEquals(opts.force_authentication_path, "/api/auth/login")
 
 end
 
@@ -75,6 +77,27 @@ function TestUtils:testDiscoveryOverride()
 
   -- assert
   lu.assertItemsEquals(opts.discovery, opts_fixture.discovery_override)
+end
+
+function TestUtils:testClearRequestHeaders()
+  -- assign
+  local headers = {}
+
+  _G.ngx = {
+    req = {
+      clear_header = function(header)
+        headers[header] = true
+      end
+    }
+  }
+
+  -- act
+  utils.clear_request_headers()
+
+  -- assert
+  lu.assertTrue(headers[constants.REQUEST_HEADERS.X_ACCESS_TOKEN])
+  lu.assertTrue(headers[constants.REQUEST_HEADERS.X_ID_TOKEN])
+  lu.assertTrue(headers[constants.REQUEST_HEADERS.X_USERINFO])
 end
 
 lu.run()
