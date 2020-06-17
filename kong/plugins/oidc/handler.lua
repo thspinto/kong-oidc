@@ -127,7 +127,7 @@ function make_oidc(oidcConfig, oidcSessionConfig)
   -- code execution has gone this far, so return 401 status code to allow client to respond accordingly
   if err == "unauthorized request" then
     ngx.log(ngx.DEBUG, "OidcHandler unauthorized ajax/async request detected, responding with 401 status code")
-    local message = cjson.encode({ status = ngx.status, request_path = ngx.var.request_uri})
+    local message = cjson.encode({ status = ngx.HTTP_UNAUTHORIZED, request_path = ngx.var.request_uri})
     return utils.exit(ngx.HTTP_UNAUTHORIZED, message, ngx.HTTP_UNAUTHORIZED)
   end
 

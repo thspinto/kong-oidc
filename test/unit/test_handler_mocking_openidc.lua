@@ -12,6 +12,15 @@ function TestHandler:setUp()
     close = function(...) end
   }
 
+  package.loaded["cjson"] = nil
+  self.cjson = {
+    encode = function(...) end,
+    decode = function(...) end
+  }
+  package.preload["cjson"] = function()
+    return self.cjson
+  end
+
   package.loaded["kong.plugins.oidc.utils"] = nil
   package.preload["kong.plugins.oidc.utils"] = require("kong.plugins.oidc.utils")
 
@@ -248,7 +257,7 @@ function TestHandler:test_introspect_ok_with_userinfo()
     return { email = "test@gmail.com", email_verified = true }
   end
 
-  package.loaded.cjson.encode = function(x)
+  self.cjson.encode = function(x)
     userinfo_to_be_encoded = x
   end
 
@@ -361,6 +370,10 @@ end
 
 function TestHandler:test_authenticate_nok_with_xmlhttprequest()
   -- arrange
+  ngx.var.request_uri = "/api/auth/unauthorized"
+  local statusCode
+  local message_status
+  local message_request_path
 
   -- add XMLHttpRequest to headers
   ngx.req.get_headers = function()
@@ -374,12 +387,25 @@ function TestHandler:test_authenticate_nok_with_xmlhttprequest()
     return {}, "unauthorized request", "/", session
   end
 
+  -- mock encode to simply return parameter to check message used in utils.exit
+  self.cjson.encode = function(x)
+    return x
+  end
+
+  package.loaded["kong.plugins.oidc.utils"].exit = function(httpStatusCode, message, ngxCode)
+    statusCode = httpStatusCode
+    message_status = message.status
+    message_request_path = message.request_path
+  end
+
   -- act
   self.handler:access({})
 
   -- assert
+  lu.assertEquals(message_status, ngx.HTTP_UNAUTHORIZED)
+  lu.assertEquals(message_request_path, ngx.var.request_uri)
   lu.assertTrue(self:log_contains("ajax/async request detected"))
-  lu.assertEquals(ngx.status, ngx.HTTP_UNAUTHORIZED)
+  lu.assertEquals(statusCode, ngx.HTTP_UNAUTHORIZED)
 end
 
 function TestHandler:test_authenticate_with_session_cookie_samesite_set_to_none()
