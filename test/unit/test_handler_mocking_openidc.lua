@@ -360,7 +360,7 @@ function TestHandler:test_authenticate_ok_with_xmlhttprequest()
   end
 
   -- act
-  self.handler:access({ force_authentication_path = forceAuthPath })
+  self.handler:access({ })
 
   -- assert
   lu.assertTrue(self:log_contains("ajax/async request detected"))
@@ -467,7 +467,7 @@ function TestHandler:test_authenticate_ok_to_non_force_authentication_path()
   lu.assertEquals(actual_unauth_action, constants.UNAUTH_ACTION.PASS)
 end
 
-function TestHandler:test_authenticate_nok_to_force_authentication_path_with_xmlhttprequest()
+function TestHandler:test_authenticate_nok_to_non_force_authentication_path_with_xmlhttprequest()
   -- arrange
   local actual_unauth_action
 
@@ -481,16 +481,39 @@ function TestHandler:test_authenticate_nok_to_force_authentication_path_with_xml
   -- mock authenticate to be able to check unauth_action
   self.module_resty.openidc.authenticate = function(opts, target_url, unauth_action)
     actual_unauth_action = unauth_action
-    return {}, "unauthorized request", "/", session
+    return {}, false, "/", session
   end
 
   -- act
   self.handler:access({ force_authentication_path = forceAuthPath })
 
   -- assert
-  lu.assertTrue(self:log_contains("ajax/async request detected"))
+  lu.assertEquals(actual_unauth_action, constants.UNAUTH_ACTION.PASS)
+end
+
+function TestHandler:test_authenticate_nok_to_force_authentication_path_with_xmlhttprequest()
+  -- arrange
+  local actual_unauth_action
+  ngx.var.uri = forceAuthPath
+
+  -- add XMLHttpRequest to headers
+  ngx.req.get_headers = function()
+    local headers = {}
+    headers["X-Requested-With"] = "XMLHttpRequest"
+    return headers
+  end
+
+  -- mock authenticate to be able to check unauth_action
+  self.module_resty.openidc.authenticate = function(opts, target_url, unauth_action)
+    actual_unauth_action = unauth_action
+    return {}, false, "/", session
+  end
+
+  -- act
+  self.handler:access({ force_authentication_path = forceAuthPath })
+
+  -- assert
   lu.assertEquals(actual_unauth_action, constants.UNAUTH_ACTION.DENY)
-  lu.assertEquals(ngx.status, ngx.HTTP_UNAUTHORIZED)
 end
 
 lu.run()

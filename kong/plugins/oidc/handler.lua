@@ -97,24 +97,27 @@ function make_oidc(oidcConfig, oidcSessionConfig)
   end
 
   local ngx_headers = ngx.req.get_headers()
+  local isAjaxRequest = ngx_headers and ngx_headers["X-Requested-With"] == "XMLHttpRequest"
 
   -- default value for unauth_action is based on force_authentication_path being set.
   -- If set, unauth_action is set to "pass", default action is to allow request through to the upstream service.
   -- If not set, unauth_action is set to nil, default action is to redirect request to idp authentication.
   local unauth_action = oidcConfig.force_authentication_path and constants.UNAUTH_ACTION.PASS or constants.UNAUTH_ACTION.NIL
 
-  -- If the request is an ajax request, set unauth_action to deny (don't redirect user if authentication fails)
-  if ngx_headers and ngx_headers["X-Requested-With"] == "XMLHttpRequest" then
-    -- reference: https://github.com/zmartzone/lua-resty-openidc/blob/master/lib/resty/openidc.lua#L1436
-    ngx.log(ngx.DEBUG, "OidcHandler ajax/async request detected, setting unauth_action = deny")
-    unauth_action = constants.UNAUTH_ACTION.DENY
-
-  -- If the request is not ajax, and matches the configured authentication path (redirect user if authentication fails)
-  elseif ngx.var.uri == oidcConfig.force_authentication_path then
+  -- if uri requested matches force authentication path, then user must be authenticated to hit upstream api (set unauth_action to nil)
+  if ngx.var.uri == oidcConfig.force_authentication_path then
     ngx.log(ngx.DEBUG, "OidcHandler force_authentication_path matched request, setting unauth_action = nil")
     unauth_action = constants.UNAUTH_ACTION.NIL
   end
 
+  local isGoingToRedirectIfUnauthenticated = unauth_action == constants.UNAUTH_ACTION.NIL
+  -- if request is an ajax request and we are forcing authentication, set unauth_action to deny, preventing 302 Http response (redirect)
+  if isAjaxRequest and isGoingToRedirectIfUnauthenticated then
+    -- reference: https://github.com/zmartzone/lua-resty-openidc/blob/master/lib/resty/openidc.lua#L1436
+    ngx.log(ngx.DEBUG, "OidcHandler ajax/async request detected, setting unauth_action = deny")
+    -- set unauth_action to deny, which will prevent openidc.authenticate from redirecting if user is unauthenticated
+    unauth_action = constants.UNAUTH_ACTION.DENY
+  end
 
   local res, err, original_url, session = openidc.authenticate(oidcConfig, nil, unauth_action, oidcSessionConfig)
 
