@@ -63,7 +63,7 @@ The `X-ID-Token` is the [ID Token](https://openid.net/specs/openid-connect-core-
 The `X-userinfo` as described above is the payload of the [Userinfo Endpoint](https://openid.net/specs/openid-connect-core-1_0.html#UserInfo).
 Per the documentation spec, it returns the Claims about the authenticated End-User. (see [Standard Claims](https://openid.net/specs/openid-connect-core-1_0.html#StandardClaims))
 
-Note the plugin currently adds three properties to userinfo response:
+Note the plugin currently adds 3 **non-standard** properties to userinfo response:
 * `iat` - set to `ngx.time()`, elapsed seconds from the epoch for the current time stamp
   * This property provides the upstream service with ability to determine if
     userinfo is cached response or not.
