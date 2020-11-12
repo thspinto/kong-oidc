@@ -33,6 +33,9 @@ function MockableCase:setUp()
     config = {
       subsystem = "http"
     },
+    encode_base64 = function(...)
+      return "base64EncodedString"
+    end,
     shared = {
       userinfo = {
         get = function(...) return nil end,

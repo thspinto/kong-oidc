@@ -18,12 +18,29 @@ in of the server-side storage mechanisms `shared-memory|memcache|redis`.
 
 It supports server-wide caching of resolved Discovery documents and validated Access Tokens.
 
-It can be used as a reverse proxy terminating OAuth/OpenID Connect in front of an origin server so that
+It can be used as a *reverse proxy terminating OAuth/OpenID Connect* in front of an origin server so that
 the origin server/services can be protected with the relevant standards without implementing those on
 the server itself.
 
 Introspection functionality add capability for already authenticated users and/or applications that
 already posses acces token to go through kong. The actual token verification is then done by Resource Server.
+
+## Use Cases
+
+The following are ways in which this plugin can be utilized:
+
+1. **Authorization Code Flow** (*reverse proxy terminating OAuth/OpenID Connect*)
+  - This use case is useful for fully managed sessions from the API Gateway.
+  - all unauthenticated requests will be redirected to the configured IDP
+    - unless `config.force_authentication_path` is used, see [Parameters](#parameters)
+  - the IDP authentication will be managed by this plugin
+    - the caller will not have to manage its own access token
+2. **Introspection**
+  - This use case is useful for third party integrations where the callers are
+    able to retrieve their own access token.
+  - By default, all requests are NOT required to contain a valid access token in the
+    Authorization header.
+    - see `bearer_only` in [Parameters](#parameters)
 
 ## How does it work
 
@@ -51,6 +68,24 @@ ngx.ctx.authenticated_consumer = {
     username = "alice"                             -- preferred_username from Userinfo
 }
 ```
+
+### Tokens and Userinfo
+
+The `X-Access-Token` is the [Access Token](https://tools.ietf.org/html/rfc6749#section-1.4) retreived from the configured IDP. An **Access Token** is usually a short-lived token. Additional info regarding access tokens can be found [here](https://developer.okta.com/docs/reference/api/oidc/#access-token).
+
+The `X-ID-Token` is the [ID Token](https://openid.net/specs/openid-connect-core-1_0.html#IDToken) retrieved from the configured IDP.
+
+[ID Tokens vs Access Tokens](https://developer.okta.com/docs/guides/validate-id-tokens/overview/)
+
+The `X-userinfo` as described above is the payload of the [Userinfo Endpoint](https://openid.net/specs/openid-connect-core-1_0.html#UserInfo).
+Per the documentation spec, it returns the Claims about the authenticated End-User. (see [Standard Claims](https://openid.net/specs/openid-connect-core-1_0.html#StandardClaims))
+
+Note the plugin currently adds 3 **non-standard** properties to userinfo response:
+* `iat` - set to `ngx.time()`, elapsed seconds from the epoch for the current time stamp
+  * This property provides the upstream service with ability to determine if
+    userinfo is cached response or not.
+* `id` - set to the `userinfo.sub`
+* `username` - set to the `userinfo.preferred_username`
 
 ### XMLHttp/Ajax Requests
 
@@ -127,6 +162,7 @@ For full support and functionality you should have a `lua_shared_dict` with the 
 | `config.introspection_expiry_claim`         |                                          | false    | Claim name that will be checked to determine cache ttl                                                                                                                                                                                                                              |
 | `config.introspection_cache_ignore`         | false                                    | false    | Forces cache to NOT be used                                                                                                                                                                                                                                                         |
 | `config.introspection_interval`             |                                          | false    | TTL that can be used to overwrite token `expiry_claim` ttl (will only be used if shorter then `expiry_claim`)                                                                                                                                                                       |
+| `config.userinfo_interval`                  |                                          |          | TTL for cache specifically designated for userinfo endpoint responses. userinfo is called for both *authorization code flow* and *introspection* (see [Use Cases](#use-cases)). `introspection_interval` takes priority over this value, if both are designated.                    |
 | `config.timeout`                            |                                          | false    | OIDC endpoint calls timeout                                                                                                                                                                                                                                                         |
 | `config.bearer_only`                        | no                                       | false    | Only introspect tokens without redirecting                                                                                                                                                                                                                                          |
 | `config.realm`                              | kong                                     | false    | Realm used in WWW-Authenticate response header                                                                                                                                                                                                                                      |
@@ -134,7 +170,7 @@ For full support and functionality you should have a `lua_shared_dict` with the 
 | `config.redirect_uri`                       |                                          | true     | URI (absolute, e.g. http://website.com) to which authorization code is sent back from OIDC Provider                                                                                                                                                                                 |
 | `config.prompt`                             |                                          | false    | Valid values include `none`, `login`, `consent` and/or `select_account`. Note if using `refresh_token` grant then `consent` is required. See [https://openid.net/specs/openid-connect-core-1_0.html#AuthRequest](https://openid.net/specs/openid-connect-core-1_0.html#AuthRequest) |
 | `config.session`                            | `{ cookie = { samesite = 'Lax' }}`       | false    | See [OIDC Session Config](#oidc-session-config)                                                                                                                                                                                                                                     |
-| `config.force_authentication_path`          |                                          | false    | See [force_authentication_path Parameter](#force_authentication_path-parameter)                                                                                                                                                                                                                       |
+| `config.force_authentication_path`          |                                          | false    | See [force_authentication_path Parameter](#force_authentication_path-parameter)                                                                                                                                                                                                     |
 
 #### Discovery Override
 

@@ -43,9 +43,10 @@ function handle(oidcConfig, oidcSessionConfig)
     -- if response, then introspect successful
     if response then
       local access_token = utils.get_bearer_access_token_from_header(oidcConfig)
-      local userinfo, err = get_userinfo(oidcConfig, response)
+      local userinfo, err = get_userinfo(oidcConfig, access_token)
 
       -- @todo: how can we distinguish between access_token and id_token?
+      -- @see: https://developer.okta.com/docs/reference/api/oidc/#introspect
       -- err can occur due to id_token being used for authorization header instead of access_token
       if err or not userinfo then
         ngx.log(ngx.DEBUG, "call to userinfo endpoint failed, attaching decoded token to user")
@@ -64,6 +65,11 @@ function handle(oidcConfig, oidcSessionConfig)
   -- no valid access token, force oidc authentication
   if response == nil then
     response = make_oidc(oidcConfig, oidcSessionConfig)
+
+    -- @todo: prevent 2nd call during authorization code flow
+    if response and response.access_token then
+      response.user = get_userinfo(oidcConfig, response.access_token)
+    end
   end
 
   -- attach headers if we have them
@@ -121,7 +127,6 @@ function make_oidc(oidcConfig, oidcSessionConfig)
 
   local res, err, original_url, session = openidc.authenticate(oidcConfig, nil, unauth_action, oidcSessionConfig)
 
-
   -- @todo: add unit test to check for session:close()
   -- handle and close session, prevent locking
   session:close()
@@ -163,8 +168,8 @@ function introspect(oidcConfig)
   return nil
 end
 
-function get_userinfo(oidcConfig, introspect_response)
-  local access_token = utils.get_bearer_access_token_from_header(oidcConfig)
+function get_userinfo(oidcConfig, access_token)
+  -- todo: should we use session instead?
   -- todo: add tests to verify cache hit
   local userinfo = utils.cache_get("userinfo", access_token)
   local err = nil
@@ -195,11 +200,11 @@ function get_userinfo(oidcConfig, introspect_response)
   -- todo: add tests to verify values are respected
   local introspection_cache_ignore = oidcConfig.introspection_cache_ignore or false
   local expiry_claim = oidcConfig.introspection_expiry_claim or "exp"
-  local introspection_interval = oidcConfig.introspection_interval or 0
+  local introspection_interval = oidcConfig.introspection_interval or oidcConfig.userinfo_interval or 0
 
-  if not introspection_cache_ignore and introspect_response[expiry_claim] then
-    local ttl = introspect_response[expiry_claim]
-    ngx.log(ngx.INFO, ttl)
+  local decoded_access_token = openidc.jwt_verify(access_token, oidcConfig)
+  if not introspection_cache_ignore and decoded_access_token[expiry_claim] then
+    local ttl = decoded_access_token[expiry_claim]
 
     if expiry_claim == "exp" then --https://tools.ietf.org/html/rfc7662#section-2.2
       ttl = ttl - ngx.time()
@@ -209,8 +214,10 @@ function get_userinfo(oidcConfig, introspect_response)
         ttl = introspection_interval
       end
     end
-    ngx.log(ngx.INFO, "setting cache now")
-    ngx.log(ngx.INFO, "cach ttl: " .. ttl)
+    ngx.log(ngx.DEBUG, "setting cache now")
+    ngx.log(ngx.DEBUG, "cache ttl: " .. ttl)
+    -- add issued at time for upstream services to be aware of when this has changed
+    userinfo.iat = ngx.time()
     utils.cache_set("userinfo", access_token, cjson.encode(userinfo), ttl)
   end
 

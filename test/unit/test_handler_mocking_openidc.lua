@@ -24,6 +24,7 @@ function TestHandler:setUp()
   package.preload["kong.plugins.oidc.utils"] = require("kong.plugins.oidc.utils")
 
   package.loaded["resty.openidc"] = nil
+  -- @todo: modularize this mock
   self.module_resty = {
     openidc = {
       authenticate = function(...)
@@ -35,6 +36,9 @@ function TestHandler:setUp()
       get_discovery_doc = function(opts)
         opts.discovery = opts.discovery or {}
         return opts
+      end,
+      jwt_verify = function(opts, access_token)
+        return {}
       end
     }
   }
@@ -116,9 +120,14 @@ end
 function TestHandler:test_authenticate_ok_with_accesstoken()
   -- arrange
   local authenticate_called = false
+  local call_userinfo_endpoint_called = false
   self.module_resty.openidc.authenticate = function(opts)
     authenticate_called = true
     return {access_token = "ACCESS_TOKEN"}, true, "/", session
+  end
+  self.module_resty.openidc.call_userinfo_endpoint = function(...)
+    call_userinfo_endpoint_called = true
+    return { email = "test@gmail.com" }
   end
 
   local headers = {}
@@ -131,6 +140,8 @@ function TestHandler:test_authenticate_ok_with_accesstoken()
 
   -- assert
   lu.assertTrue(authenticate_called)
+  -- call_userinfo_endpoint called when access token is returned
+  lu.assertTrue(call_userinfo_endpoint_called)
   lu.assertEquals(headers[constants.REQUEST_HEADERS.X_ACCESS_TOKEN], "ACCESS_TOKEN")
 end
 
