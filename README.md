@@ -18,12 +18,29 @@ in of the server-side storage mechanisms `shared-memory|memcache|redis`.
 
 It supports server-wide caching of resolved Discovery documents and validated Access Tokens.
 
-It can be used as a reverse proxy terminating OAuth/OpenID Connect in front of an origin server so that
+It can be used as a *reverse proxy terminating OAuth/OpenID Connect* in front of an origin server so that
 the origin server/services can be protected with the relevant standards without implementing those on
 the server itself.
 
 Introspection functionality add capability for already authenticated users and/or applications that
 already posses acces token to go through kong. The actual token verification is then done by Resource Server.
+
+## Use Cases
+
+The following are ways in which this plugin can be utilized:
+
+1. **Authorization Code Flow** (*reverse proxy terminating OAuth/OpenID Connect*)
+  - This use case is useful for fully managed sessions from the API Gateway.
+  - all unauthenticated requests will be redirected to the configured IDP
+    - unless `config.force_authentication_path` is used, see [Parameters](#parameters)
+  - the IDP authentication will be managed by this plugin
+    - the caller will not have to manage its own access token
+2. **Introspection**
+  - This use case is useful for third party integrations where the callers are
+    able to retrieve their own access token.
+  - By default, all requests are NOT required to contain a valid access token in the
+    Authorization header.
+    - see `bearer_only` in [Parameters](#parameters)
 
 ## How does it work
 
@@ -145,7 +162,7 @@ For full support and functionality you should have a `lua_shared_dict` with the 
 | `config.introspection_expiry_claim`         |                                          | false    | Claim name that will be checked to determine cache ttl                                                                                                                                                                                                                              |
 | `config.introspection_cache_ignore`         | false                                    | false    | Forces cache to NOT be used                                                                                                                                                                                                                                                         |
 | `config.introspection_interval`             |                                          | false    | TTL that can be used to overwrite token `expiry_claim` ttl (will only be used if shorter then `expiry_claim`)                                                                                                                                                                       |
-| `config.userinfo_interval`                  |                                          |          | TTL for cache specifically designated for userinfo endpoint responses. userinfo is called for both authorization code flow and introspection. `introspection_interval` takes priority over this value.                                                                              |
+| `config.userinfo_interval`                  |                                          |          | TTL for cache specifically designated for userinfo endpoint responses. userinfo is called for both *authorization code flow* and *introspection* (see [Use Cases](#use-cases)). `introspection_interval` takes priority over this value, if both are designated.                    |
 | `config.timeout`                            |                                          | false    | OIDC endpoint calls timeout                                                                                                                                                                                                                                                         |
 | `config.bearer_only`                        | no                                       | false    | Only introspect tokens without redirecting                                                                                                                                                                                                                                          |
 | `config.realm`                              | kong                                     | false    | Realm used in WWW-Authenticate response header                                                                                                                                                                                                                                      |
