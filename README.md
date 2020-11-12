@@ -52,6 +52,24 @@ ngx.ctx.authenticated_consumer = {
 }
 ```
 
+### Tokens and Userinfo
+
+The `X-Access-Token` is the [Access Token](https://tools.ietf.org/html/rfc6749#section-1.4) retreived from the configured IDP. An **Access Token** is usually a short-lived token. Additional info regarding access tokens can be found [here](https://developer.okta.com/docs/reference/api/oidc/#access-token).
+
+The `X-ID-Token` is the [ID Token](https://openid.net/specs/openid-connect-core-1_0.html#IDToken) retrieved from the configured IDP.
+
+[ID Tokens vs Access Tokens](https://developer.okta.com/docs/guides/validate-id-tokens/overview/)
+
+The `X-userinfo` as described above is the payload of the [Userinfo Endpoint](https://openid.net/specs/openid-connect-core-1_0.html#UserInfo).
+Per the documentation spec, it returns the Claims about the authenticated End-User. (see [Standard Claims](https://openid.net/specs/openid-connect-core-1_0.html#StandardClaims))
+
+Note the plugin currently adds three properties to userinfo response:
+* `iat` - set to `ngx.time()`, elapsed seconds from the epoch for the current time stamp
+  * This property provides the upstream service with ability to determine if
+    userinfo is cached response or not.
+* `id` - set to the `userinfo.sub`
+* `username` - set to the `userinfo.preferred_username`
+
 ### XMLHttp/Ajax Requests
 
 XMLHttpRequests made by client-side code (i.e ajax) should include the `X-Requested-With: XMLHttpRequest` header. 302 Redirects are replaced with 401 Unauthorized HTTP responses when this header is present AND the user is unauthenticated.
@@ -127,6 +145,7 @@ For full support and functionality you should have a `lua_shared_dict` with the 
 | `config.introspection_expiry_claim`         |                                          | false    | Claim name that will be checked to determine cache ttl                                                                                                                                                                                                                              |
 | `config.introspection_cache_ignore`         | false                                    | false    | Forces cache to NOT be used                                                                                                                                                                                                                                                         |
 | `config.introspection_interval`             |                                          | false    | TTL that can be used to overwrite token `expiry_claim` ttl (will only be used if shorter then `expiry_claim`)                                                                                                                                                                       |
+| `config.userinfo_interval`                  |                                          |          | TTL for cache specifically designated for userinfo endpoint responses. userinfo is called for both authorization code flow and introspection. `introspection_interval` takes priority over this value.                                                                              |
 | `config.timeout`                            |                                          | false    | OIDC endpoint calls timeout                                                                                                                                                                                                                                                         |
 | `config.bearer_only`                        | no                                       | false    | Only introspect tokens without redirecting                                                                                                                                                                                                                                          |
 | `config.realm`                              | kong                                     | false    | Realm used in WWW-Authenticate response header                                                                                                                                                                                                                                      |
@@ -134,7 +153,7 @@ For full support and functionality you should have a `lua_shared_dict` with the 
 | `config.redirect_uri`                       |                                          | true     | URI (absolute, e.g. http://website.com) to which authorization code is sent back from OIDC Provider                                                                                                                                                                                 |
 | `config.prompt`                             |                                          | false    | Valid values include `none`, `login`, `consent` and/or `select_account`. Note if using `refresh_token` grant then `consent` is required. See [https://openid.net/specs/openid-connect-core-1_0.html#AuthRequest](https://openid.net/specs/openid-connect-core-1_0.html#AuthRequest) |
 | `config.session`                            | `{ cookie = { samesite = 'Lax' }}`       | false    | See [OIDC Session Config](#oidc-session-config)                                                                                                                                                                                                                                     |
-| `config.force_authentication_path`          |                                          | false    | See [force_authentication_path Parameter](#force_authentication_path-parameter)                                                                                                                                                                                                                       |
+| `config.force_authentication_path`          |                                          | false    | See [force_authentication_path Parameter](#force_authentication_path-parameter)                                                                                                                                                                                                     |
 
 #### Discovery Override
 
