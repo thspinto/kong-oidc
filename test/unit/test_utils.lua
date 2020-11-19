@@ -15,6 +15,7 @@ function TestUtils:setUp()
     scope = "openid",
     response_type = "code",
     ssl_verify = "no",
+    access_token_expires_leeway = 5,
     token_endpoint_auth_method = "client_secret_post",
     introspection_endpoint_auth_method = "client_secret_basic",
     introspection_expiry_claim = "expires",
@@ -51,6 +52,7 @@ function TestUtils:testOptions()
   lu.assertEquals(opts.scope, "openid")
   lu.assertEquals(opts.response_type, "code")
   lu.assertEquals(opts.ssl_verify, "no")
+  lu.assertEquals(opts.access_token_expires_leeway, 5)
   lu.assertEquals(opts.token_endpoint_auth_method, "client_secret_post")
   lu.assertEquals(opts.introspection_endpoint_auth_method, "client_secret_basic")
   lu.assertEquals(opts.introspection_expiry_claim, "expires")
