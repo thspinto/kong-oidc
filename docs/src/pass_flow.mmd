@@ -1,0 +1,22 @@
+title Kong OIDC Plugin - "pass" functionality
+
+participant User
+participant OIDC Provider
+participant Kong
+participant Upstream API
+
+Note over User,Upstream API: When user isn't authenticated
+User->Kong: GET /<api>
+Kong->Upstream API: GET /<api> without x-userinfo
+Upstream API->User: HTTP response
+
+Note over User,Upstream API: When user isn't authenticated (force_authentication_path)
+User->Kong: GET /force_authentication_path
+Kong->User: Redirect to OIDC Provider for Authorization Grant
+User->+OIDC Provider: Login
+OIDC Provider->-User: Redirect to Kong with Authorization Grant
+note right of User: See "How does Kong OIDC work?" diagram for rest of sequence.
+
+Note over User,Upstream API: When user is authenticated
+User->Kong: GET /<api>
+Kong->Upstream API: GET /<api> with x-userinfo

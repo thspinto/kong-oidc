@@ -5,28 +5,44 @@ local MockableCase = BaseCase:extend()
 function MockableCase:setUp()
   MockableCase.super:setUp()
   self.logs = {}
+
   self.mocked_ngx = {
     DEBUG = "debug",
     ERR = "error",
+    INFO = "info",
     HTTP_UNAUTHORIZED = 401,
     ctx = {},
     header = {},
-    var = {request_uri = "/"},
+    var = {
+      request_uri = "/",
+      uri = "/"
+    },
     req = {
       get_uri_args = function(...) end,
       set_header = function(...) end,
-      get_headers = function(...) end
+      get_headers = function(...) end,
+      clear_header = function(...) end
     },
     log = function(...)
       self.logs[#self.logs+1] = table.concat({...}, " ")
-      print("ngx.log: ", self.logs[#self.logs])
+      -- print("ngx.log: ", self.logs[#self.logs])
     end,
     say = function(...) end,
     exit = function(...) end,
     redirect = function(...) end,
     config = {
       subsystem = "http"
-    }
+    },
+    encode_base64 = function(...)
+      return "base64EncodedString"
+    end,
+    shared = {
+      userinfo = {
+        get = function(...) return nil end,
+        set = function(...) return nil end
+      }
+    },
+    time = function() return 1589290000 end
   }
   self.ngx = _G.ngx
   _G.ngx = self.mocked_ngx

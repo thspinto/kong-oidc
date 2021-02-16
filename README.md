@@ -18,18 +18,42 @@ in of the server-side storage mechanisms `shared-memory|memcache|redis`.
 
 It supports server-wide caching of resolved Discovery documents and validated Access Tokens.
 
-It can be used as a reverse proxy terminating OAuth/OpenID Connect in front of an origin server so that
+It can be used as a *reverse proxy terminating OAuth/OpenID Connect* in front of an origin server so that
 the origin server/services can be protected with the relevant standards without implementing those on
 the server itself.
 
 Introspection functionality add capability for already authenticated users and/or applications that
 already posses acces token to go through kong. The actual token verification is then done by Resource Server.
 
+## Use Cases
+
+The following are ways in which this plugin can be utilized:
+
+1. **Authorization Code Flow** (*reverse proxy terminating OAuth/OpenID Connect*)
+  - This use case is useful for fully managed sessions from the API Gateway.
+  - all unauthenticated requests will be redirected to the configured IDP
+    - unless `config.force_authentication_path` is used, see [Parameters](#parameters)
+  - the IDP authentication will be managed by this plugin
+    - the caller will not have to manage its own access token
+2. **Introspection**
+  - This use case is useful for third party integrations where the callers are
+    able to retrieve their own access token.
+  - By default, all requests are NOT required to contain a valid access token in the
+    Authorization header.
+    - see `bearer_only` in [Parameters](#parameters)
+
 ## How does it work
 
 The diagram below shows the message exchange between the involved parties.
 
 ![alt Kong OIDC flow](docs/kong_oidc_flow.png)
+
+For security purposes the following headers are stripped at the beginning of this plugins execution:
+* `X-Access-Token`
+* `X-ID-Token`
+* `X-Userinfo`
+
+These headers will only be appended to the requests if the user is authenticated or has a valid session.
 
 The `X-Userinfo` header contains the payload from the Userinfo Endpoint
 
@@ -45,12 +69,57 @@ ngx.ctx.authenticated_consumer = {
 }
 ```
 
+### Tokens and Userinfo
+
+The `X-Access-Token` is the [Access Token](https://tools.ietf.org/html/rfc6749#section-1.4) retreived from the configured IDP. An **Access Token** is usually a short-lived token. Additional info regarding access tokens can be found [here](https://developer.okta.com/docs/reference/api/oidc/#access-token).
+
+The `X-ID-Token` is the [ID Token](https://openid.net/specs/openid-connect-core-1_0.html#IDToken) retrieved from the configured IDP.
+
+[ID Tokens vs Access Tokens](https://developer.okta.com/docs/guides/validate-id-tokens/overview/)
+
+The `X-userinfo` as described above is the payload of the [Userinfo Endpoint](https://openid.net/specs/openid-connect-core-1_0.html#UserInfo).
+Per the documentation spec, it returns the Claims about the authenticated End-User. (see [Standard Claims](https://openid.net/specs/openid-connect-core-1_0.html#StandardClaims))
+
+Note the plugin currently adds 3 **non-standard** properties to userinfo response:
+* `iat` - set to `ngx.time()`, elapsed seconds from the epoch for the current time stamp
+  * This property provides the upstream service with ability to determine if
+    userinfo is cached response or not.
+* `id` - set to the `userinfo.sub`
+* `username` - set to the `userinfo.preferred_username`
+
+### XMLHttp/Ajax Requests
+
+XMLHttpRequests made by client-side code (i.e ajax) should include the `X-Requested-With: XMLHttpRequest` header. 302 Redirects are replaced with 401 Unauthorized HTTP responses when this header is present AND the user is unauthenticated.
+
+#### Why?
+
+302 redirects are followed transparently via XMLHttpRequests (xhr/ajax requests) thus there is nothing the client side can do to detect if a 302 happened. Returning a status code of 401 allows the client to respond to the request accordingly.
+
+The response body of this 401 is as follows:
+
+```
+{
+  "status":401,
+  "request_path":"/api/path"
+}
+```
+
+Currently we do NOT have access to the redirect url that **lua-resty-openidc** would normally generate thus we only respond with the above body. When **lua-resty-openidc** exposes the method generating the authorization code path uri then we change the http response body the following:
+
+```
+{
+  "status":302,
+  "request_path":"/api/path",
+  "redirect_path":"https://idp.com/oauth/authorize?client_id=a17c21ed&response_type=code..."
+}
+```
 
 ## Dependencies
 
 **kong-oidc** depends on the following package:
 
 - [`lua-resty-openidc`](https://github.com/pingidentity/lua-resty-openidc/)
+  - [`lua-resty-session`](https://github.com/bungle/lua-resty-session)
 
 
 ## Installation
@@ -63,25 +132,109 @@ You also need to set the `KONG_PLUGINS` environment variable
 
      export KONG_PLUGINS=oidc
 
+### Caching
+
+This plugin and `lua-resty-openidc` luarocks package utilizes the http `lua_shared_dict` directive for caching. Thus to utilize this plugin effectively, please review the following sample configurations for nginx:
+* [https://github.com/zmartzone/lua-resty-openidc#sample-configuration-for-google-signin](https://github.com/zmartzone/lua-resty-openidc#sample-configuration-for-google-signin)
+* [https://github.com/zmartzone/lua-resty-openidc#sample-configuration-for-pingfederate-oauth-20](https://github.com/zmartzone/lua-resty-openidc#sample-configuration-for-pingfederate-oauth-20)
+
+For full support and functionality you should have a `lua_shared_dict` with the following names:
+- introspection
+- discovery
+- jwks
+- userinfo
+
 ## Usage
 
 ### Parameters
 
-| Parameter | Default  | Required | description |
-| --- | --- | --- | --- |
-| `name` || true | plugin name, has to be `oidc` |
-| `config.client_id` || true | OIDC Client ID |
-| `config.client_secret` || true | OIDC Client secret |
-| `config.discovery` | https://.well-known/openid-configuration | false | OIDC Discovery Endpoint (`/.well-known/openid-configuration`) |
-| `config.scope` | openid | false| OAuth2 Token scope. To use OIDC it has to contains the `openid` scope |
-| `config.ssl_verify` | false | false | Enable SSL verification to OIDC Provider |
-| `config.session_secret` | | false | Additional parameter, which is used to encrypt the session cookie. Needs to be random |
-| `config.introspection_endpoint` | | false | Token introspection endpoint |
-| `config.timeout` | | false | OIDC endpoint calls timeout |
-| `config.introspection_endpoint_auth_method` | client_secret_basic | false | Token introspection auth method. resty-openidc supports `client_secret_(basic|post)` |
-| `config.bearer_only` | no | false | Only introspect tokens without redirecting |
-| `config.realm` | kong | false | Realm used in WWW-Authenticate response header |
-| `config.logout_path` | /logout | false | Absolute path used to logout from the OIDC RP |
+| Parameter                                   | Default                                  | Required | description                                                                                                                                                                                                                                                                         |
+| ------------------------------------------- | ---------------------------------------- | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `name`                                      |                                          | true     | plugin name, has to be `oidc`                                                                                                                                                                                                                                                       |
+| `config.client_id`                          |                                          | true     | OIDC Client ID                                                                                                                                                                                                                                                                      |
+| `config.client_secret`                      |                                          | true     | OIDC Client secret                                                                                                                                                                                                                                                                  |
+| `config.discovery`                          | https://.well-known/openid-configuration | true     | OIDC Discovery Endpoint (`/.well-known/openid-configuration`)                                                                                                                                                                                                                       |
+| `config.discovery_override`                 |                                          | false    | This is a **map** type with multiple properties. See [Discovery Override](#discovery-override) below.                                                                                                                                                                               |
+| `config.scope`                              | openid                                   | false    | OAuth2 Token scope. To use OIDC it has to contains the `openid` scope. Note if using `refresh_token` grant then include `offline_access` as a scope.                                                                                                                                |
+| `config.ssl_verify`                         | false                                    | false    | Enable SSL verification to OIDC Provider                                                                                                                                                                                                                                            |
+| `config.session_secret`                     |                                          | false    | Additional parameter, which is used to encrypt the session cookie. Needs to be random                                                                                                                                                                                               |
+| `config.access_token_expires_leeway`        | 0                                        | false    | Configures when the renewal of access token will occur. Setting this makes the renewal happen X seconds before token expiration                                                                                                                                                     |
+| `config.introspection_endpoint_auth_method` | client_secret_basic                      | false    | Token introspection auth method. resty-openidc supports `client_secret_(basic|post)`                                                                                                                                                                                                |
+| `config.introspection_expiry_claim`         |                                          | false    | Claim name that will be checked to determine cache ttl                                                                                                                                                                                                                              |
+| `config.introspection_cache_ignore`         | false                                    | false    | Forces cache to NOT be used                                                                                                                                                                                                                                                         |
+| `config.introspection_interval`             |                                          | false    | TTL that can be used to overwrite token `expiry_claim` ttl (will only be used if shorter then `expiry_claim`)                                                                                                                                                                       |
+| `config.userinfo_interval`                  |                                          |          | TTL for cache specifically designated for userinfo endpoint responses. userinfo is called for both *authorization code flow* and *introspection* (see [Use Cases](#use-cases)). `introspection_interval` takes priority over this value, if both are designated.                    |
+| `config.timeout`                            |                                          | false    | OIDC endpoint calls timeout                                                                                                                                                                                                                                                         |
+| `config.bearer_only`                        | no                                       | false    | Only introspect tokens without redirecting                                                                                                                                                                                                                                          |
+| `config.realm`                              | kong                                     | false    | Realm used in WWW-Authenticate response header                                                                                                                                                                                                                                      |
+| `config.logout_path`                        | /logout                                  | false    | Absolute path used to logout from the OIDC RP                                                                                                                                                                                                                                       |
+| `config.redirect_uri`                       |                                          | true     | URI (absolute, e.g. http://website.com) to which authorization code is sent back from OIDC Provider                                                                                                                                                                                 |
+| `config.prompt`                             |                                          | false    | Valid values include `none`, `login`, `consent` and/or `select_account`. Note if using `refresh_token` grant then `consent` is required. See [https://openid.net/specs/openid-connect-core-1_0.html#AuthRequest](https://openid.net/specs/openid-connect-core-1_0.html#AuthRequest) |
+| `config.session`                            | `{ cookie = { samesite = 'Lax' }}`       | false    | See [OIDC Session Config](#oidc-session-config)                                                                                                                                                                                                                                     |
+| `config.force_authentication_path`          |                                          | false    | See [force_authentication_path Parameter](#force_authentication_path-parameter)                                                                                                                                                                                                     |
+
+#### Discovery Override
+
+The following properties should be used if the **Discovery Endpoint** of the OIDC IDP is not available and/or known.
+
+The descriptions for the following parameters were referenced from the following websites:
+* [OpenId.net](https://openid.net/specs/openid-connect-discovery-1_0.html#ProviderMetadata)
+* [IdentityServer4](http://docs.identityserver.io/en/latest/index.html)
+  * **Note:** this is not the standard creator for OIDC but does provide valid descriptions and detail regarding purpose of endpoints.
+
+| Parameter                                 | Required | Description                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| ----------------------------------------- | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `config.discovery.authorization_endpoint` | true     | URL of the OP's OAuth 2.0 Authorization Endpoint.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| `config.discovery.token_endpoint`         | true     | URL of the OP's OAuth 2.0 Token Endpoint. This is REQUIRED unless only the Implicit Flow is used.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| `config.discovery.userinfo_endpoint`      | true     | RECOMMENDED. URL of the OP's UserInfo Endpoint. This URL MUST use the https scheme and MAY contain port, path, and query parameter components.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| `config.discovery.jwks_uri`               | true     | REQUIRED. URL of the OP's JSON Web Key Set document. This contains the signing key(s) the RP uses to validate signatures from the OP. The JWK Set MAY also contain the Server's encryption key(s), which are used by RPs to encrypt requests to the Server. When both signing and encryption keys are made available, a use (Key Use) parameter value is REQUIRED for all keys in the referenced JWK Set to indicate each key's intended usage. Although some algorithms allow the same key to be used for both signatures and encryption, doing so is NOT RECOMMENDED, as it is less secure. The JWK x5c parameter MAY be used to provide X.509 representations of keys provided. When used, the bare key values MUST still be present and MUST match those in the certificate. |
+| `config.discovery.revocation_endpoint`    | true     | This endpoint allows revoking access tokens (reference tokens only) and refresh token.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| `config.discovery.issuer`                 | true     | REQUIRED. URL using the https scheme with no query or fragment component that the OP asserts as its Issuer Identifier. If Issuer discovery is supported, this value MUST be identical to the issuer value returned by WebFinger. This also MUST be identical to the iss Claim value in ID Tokens issued from this Issuer.                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| `config.discovery.introspection_endpoint` | false    | It can be used to validate reference tokens (or JWTs if the consumer does not have support for appropriate JWT or cryptographic libraries).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| `config.discovery.end_session_endpoint`   | false    | The end session endpoint can be used to trigger single sign-out.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+
+#### OIDC Session Config
+
+This section details the supported configuration options for the OIDC session.
+
+Note: the following parameter is NOT a flat configuration object (i.e YAML structure will need to be followed).
+
+For example:
+
+```YAML
+config:
+  session:
+    cookie:
+      samesite: 'Strict'
+```
+
+The following table documents the supported properties. If a non-supported property is supplied Kong will throw an error.
+
+These properties are provided to `session.start(opts)`, for more information on the options see [lua-resty-session](https://github.com/bungle/lua-resty-session).
+
+| Parameter                        | Required | Default | Description                                       |
+| -------------------------------- | -------- | ------- | ------------------------------------------------- |
+| `config.session.cookie.samesite` | false    | Lax     | Determines the value of the cookie SameSite flag. |
+
+##### Why does kong-oidc use a session?
+
+**kong-oidc** uses a resty library called `lua-resty-openidc` (see [Dependencies](#dependencies)). This library uses a session for storing various values during the authentication process for the [Authorization Code Flow](https://openid.net/specs/openid-connect-core-1_0.html#CodeFlowAuth). These values include the [following](https://github.com/zmartzone/lua-resty-openidc/blob/v1.7.2/lib/resty/openidc.lua#L349):
+- original_url - Kong needs to remember after it authenticates you, where your original request was supposed to go.
+- state - CSRF/XSRF mitigation
+- nonce - Replay attack mitigation
+- last_authenticated - used for silent reauthentication
+
+#### force_authentication_path Parameter
+
+By default, the **kong oidc** plugin prevents unauthenticated requests from reaching the upstream api. When the `force_authentication_path` parameter is set, the behavior is changed.
+
+Setting the `force_authentication_path` parameter changes the plugin behavior to allow unauthenticated request to reach the upstream API. Unauthenticated requests will be proxied without `x-userinfo` headers. Authenticated requests will be proxied with `x-userinfo`.
+
+The `force_authentication_path` variable should be a *string* relative url path value (e.g `/api/auth/login`). When a request is made to the defined path if the user is unauthenticated then the plugin will respond with a 302 HTTP status code to redirect the user to the IDP login page (authentication code flow).
+
+The following diagram illustrates how the behavior of **kong-oidc** plugin when the parameter `force_authentication_path` is set.
+
+![alt Kong OIDC force authentication path](docs/kong_oidc_force_auth_path.png)
 
 ### Enabling
 
@@ -136,7 +289,7 @@ Server: kong/0.11.0
 
 ### Upstream API request
 
-The plugin adds a additional `X-Userinfo`, `X-Access-Token` and `X-Id-Token` headers to the upstream request, which can be consumer by upstream server. All of them are base64 encoded:
+The plugin adds an additional `X-Userinfo`, `X-Access-Token` and `X-Id-Token` headers to the upstream request, which can be consumer by upstream server. Note if these headers were present in the request prior to the execution of this plugin, then they will be removed/overwritten. All of them are base64 encoded:
 
 ```
 GET / HTTP/1.1
@@ -162,6 +315,10 @@ X-Id-Token: eyJuYmYiOjAsImF6cCI6ImtvbmciLCJpYXQiOjE1NDg1MTA3NjksImlzcyI6Imh0dHA6
 
 ## Development
 
+The following references are useful to those that are new to kong plugin development:
+* [https://docs.konghq.com/1.5.x/plugin-development/file-structure/](https://docs.konghq.com/1.5.x/plugin-development/file-structure/)
+* [https://docs.konghq.com/1.5.x/plugin-development/custom-logic/](https://docs.konghq.com/1.5.x/plugin-development/custom-logic/)
+
 ### Running Unit Tests
 
 To run unit tests, run the following command:
@@ -171,6 +328,7 @@ To run unit tests, run the following command:
 ```
 
 This may take a while for the first run, as the docker image will need to be built, but subsequent runs will be quick.
+
 
 ### Building the Integration Test Environment
 
@@ -187,6 +345,29 @@ To tear the environment down:
 ./bin/teardown-env.sh
 ```
 
-### MacOS
+## Roadmap
 
-Use [brew to install Kong](https://github.com/Kong/homebrew-kong)
+### Supporting Multiple IDPS
+
+The following is pseudocode/pseudo-schema for the ability to handle mutiple identity providers:
+```
+    - name: oidc
+      config:
+        logout_path: /echo_service/api/logout
+        redirect_uri: http://localhost:8000/echo_service/api/custom-oidc-cb
+        redirect_after_logout_uri: http://localhost:8000/echo_service/public/logout
+        idp_host_header_prop: sky_host
+        configs:
+          custom-oidc.com:
+            introspection_endpoint_auth_method: client_secret_post
+            scope: "openid offline_access"
+            prompt: consent
+            token_endpoint_auth_method: client_secret_post
+            client_id: foo
+            client_secret: bar
+            discovery:
+            - protocol: https
+            - port: 9002
+            - path: .well-known/openid-configuration
+            # - uri: http://custom-oidc:9002/.well-known/openid-configuration
+```

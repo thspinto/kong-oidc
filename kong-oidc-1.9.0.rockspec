@@ -1,8 +1,8 @@
 package = "kong-oidc"
-version = "2.0.0-0"
+version = "1.9.0"
 source = {
     url = "git://github.com/thspinto/kong-oidc",
-    tag = "v2.0.0-0",
+    tag = "v1.9.0",
     dir = "kong-oidc"
 }
 description = {
@@ -22,7 +22,7 @@ description = {
     license = "Apache 2.0"
 }
 dependencies = {
-    "lua-resty-openidc ~> 1.7.4"
+    "lua-resty-openidc ~> 1.7.2"
 }
 build = {
     type = "builtin",
