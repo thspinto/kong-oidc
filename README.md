@@ -2,7 +2,7 @@
 
 [![Join the chat at https://gitter.im/nokia/kong-oidc](https://badges.gitter.im/nokia/kong-oidc.svg)](https://gitter.im/nokia/kong-oidc?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
 
-**Continuous Integration:** [![Build Status](https://travis-ci.org/nokia/kong-oidc.svg?branch=master)](https://travis-ci.org/nokia/kong-oidc) 
+**Continuous Integration:** [![Build Status](https://travis-ci.org/nokia/kong-oidc.svg?branch=master)](https://travis-ci.org/nokia/kong-oidc)
 [![Coverage Status](https://coveralls.io/repos/github/nokia/kong-oidc/badge.svg?branch=master)](https://coveralls.io/github/nokia/kong-oidc?branch=master) <br/>
 
 **kong-oidc** is a plugin for [Kong](https://github.com/Mashape/kong) implementing the
@@ -62,7 +62,7 @@ If you're using `luarocks` execute the following:
 You also need to set the `KONG_PLUGINS` environment variable
 
      export KONG_PLUGINS=oidc
-     
+
 ## Usage
 
 ### Parameters
@@ -186,3 +186,7 @@ To tear the environment down:
 ```
 ./bin/teardown-env.sh
 ```
+
+### MacOS
+
+Use [brew to install Kong](https://github.com/Kong/homebrew-kong)

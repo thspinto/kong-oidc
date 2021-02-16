@@ -19,7 +19,7 @@ services:
       KEYCLOAK_PASSWORD: ${KEYCLOAK_PW}
 
   kong:
-    image: nokia/kong-oidc${KONG_TAG}
+    image: ${BUILD_IMG_NAME}
     ports:
       - 8000:8000
       - 8443:8443

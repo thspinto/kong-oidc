@@ -10,8 +10,8 @@
 
   (set -x
     # Tear down environment if it is running
-    docker-compose -f ${INTEGRATION_PATH}/docker-compose.yml down 
-    docker build --build-arg KONG_BASE_TAG=${KONG_BASE_TAG} -t nokia/kong-oidc -f ${INTEGRATION_PATH}/Dockerfile .
+    docker-compose -f ${INTEGRATION_PATH}/docker-compose.yml down
+    docker build --build-arg KONG_BASE_TAG=${KONG_BASE_TAG} -t ${BUILD_IMG_NAME} -f ${INTEGRATION_PATH}/Dockerfile .
     docker-compose -f ${INTEGRATION_PATH}/docker-compose.yml up -d kong-db
   )
 
