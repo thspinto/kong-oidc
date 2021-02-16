@@ -13,6 +13,7 @@ RUN yum install -y unzip gcc
 RUN luarocks install luacov
 RUN luarocks install luaunit
 RUN luarocks install lua-cjson
+RUN luarocks install lua-resty-string
 
 # Change openidc version when version in rockspec changes
 RUN luarocks install lua-resty-openidc ${LUA_RESTY_OPENIDC_VERSION}
